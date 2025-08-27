@@ -1,0 +1,68 @@
+.hidden {
+    display: none !important;
+}
+
+.text-success {
+    color: #28a745;
+}
+
+.text-danger {
+    color: #dc3545;
+}
+
+/* Estilo para os botões de ícone */
+.icon-button {
+    background: none;
+    border: none;
+    color: #007bff;
+    font-size: 1.2em;
+    padding: 5px;
+    width: auto;
+    transition: color 0.3s ease;
+}
+
+.icon-button:hover {
+    color: #0056b3;
+    background: none;
+}
+
+.edit-button {
+    color: #ffc107;
+}
+.edit-button:hover {
+    color: #e0a800;
+}
+
+.delete-button {
+    color: #dc3545;
+}
+.delete-button:hover {
+    color: #c82333;
+}
+
+.confirm-button {
+    color: #28a745;
+}
+.confirm-button:hover {
+    color: #218838;
+}
+
+.delete-account-button {
+    background-color: #dc3545;
+    color: #fff;
+    padding: 5px 8px;
+    font-size: 0.7em;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    line-height: 1;
+    margin-left: 10px;
+    flex-shrink: 0;
+}
+
+.delete-account-button:hover {
+    background-color: #c82333;
+}

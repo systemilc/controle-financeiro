@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle de Finanças - Multi-Contas</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div id="login-screen" class="container d-flex justify-content-center align-items-center vh-100">
+        <div class="card p-4 shadow-sm w-100" style="max-width: 400px;">
+            <h1 class="card-title text-center text-primary">Acesso Protegido</h1>
+            <form id="login-form">
+                <div class="mb-3">
+                    <label for="password" class="form-label">Senha:</label>
+                    <input type="password" class="form-control" id="password" required>
+                </div>
+                <button type="submit" class="btn btn-primary w-100">Entrar</button>
+                <p id="error-message" class="text-danger text-center mt-3 hidden">Senha incorreta. Tente novamente.</p>
+            </form>
+        </div>
+    </div>
+
+    <div id="main-app" class="container mt-5 hidden">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="text-primary">Meu Controle Financeiro</h1>
+            <button id="logout-button" class="btn btn-danger">Sair</button>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-6 mb-4">
+                <div class="card p-3 shadow-sm">
+                    <h2 class="text-primary">Resumo Consolidado</h2>
+                    <p class="mb-1">Receita Total: <span id="total-income" class="fw-bold text-success">R$ 0,00</span></p>
+                    <p class="mb-1">Despesa Total: <span id="total-expense" class="fw-bold text-danger">R$ 0,00</span></p>
+                    <p class="mb-1">Saldo Total: <span id="balance" class="fw-bold">R$ 0,00</span></p>
+                </div>
+                <div class="card p-3 shadow-sm mt-3">
+                    <h2 class="text-primary">Saldos por Conta (Líquido)</h2>
+                    <ul id="accounts-summary-list" class="list-group list-group-flush"></ul>
+                </div>
+            </div>
+
+            <div class="col-md-6 mb-4">
+                <div class="card p-3 shadow-sm">
+                    <form id="account-form">
+                        <h2 class="text-primary">Adicionar Conta</h2>
+                        <div class="mb-3">
+                            <label for="account-name" class="form-label">Nome da Conta:</label>
+                            <input type="text" class="form-control" id="account-name" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">Adicionar Conta</button>
+                    </form>
+                </div>
+
+                <div class="card p-3 shadow-sm mt-3">
+                    <form id="transaction-form">
+                        <h2 id="form-title" class="text-primary">Adicionar Transação</h2>
+                        <input type="hidden" id="transaction-id">
+                        <div class="mb-3">
+                            <label for="account-select" class="form-label">Conta:</label>
+                            <select class="form-select" id="account-select" required></select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Descrição:</label>
+                            <input type="text" class="form-control" id="description" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="amount" class="form-label">Valor:</label>
+                            <input type="number" class="form-control" id="amount" step="0.01" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="type" class="form-label">Tipo:</label>
+                            <select class="form-select" id="type" required>
+                                <option value="income">Receita</option>
+                                <option value="expense">Despesa</option>
+                            </select>
+                        </div>
+                        <button type="submit" id="submit-button" class="btn btn-primary w-100">Adicionar</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card p-3 shadow-sm mt-3 mb-5">
+            <h2 class="text-primary">Histórico de Transações</h2>
+            <ul id="transaction-list" class="list-group list-group-flush"></ul>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
