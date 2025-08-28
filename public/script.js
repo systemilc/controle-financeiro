@@ -13,6 +13,9 @@ const accountSelect = document.getElementById('account-select');
 const formTitle = document.getElementById('form-title');
 const submitButton = document.getElementById('submit-button');
 const transactionIdInput = document.getElementById('transaction-id');
+const transactionDateInput = document.getElementById('transaction-date');
+const transactionDateDisplayInput = document.getElementById('transaction-date-display');
+const calendarIconBtn = document.querySelector('.calendar-icon-btn');
 const transactionList = document.getElementById('transaction-list');
 const accountsSummaryList = document.getElementById('accounts-summary-list');
 const totalIncomeEl = document.getElementById('total-income');
@@ -24,16 +27,23 @@ let userId = null;
 let allAccounts = [];
 
 // Funções utilitárias
-const formatDateTime = (isoString) => {
-    const date = new Date(isoString);
+const formatDateForDisplay = (dateString) => {
+    if (!dateString) return 'Data Inválida';
+    // O construtor de data sem o tempo usa o fuso horário local, resolvendo o problema
+    const date = new Date(dateString);
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const year = date.getFullYear();
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    return `${day}/${month}/${year} ${hours}:${minutes}`;
+    return `${day}/${month}/${year}`;
 };
 
+const getTodayDate = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
 
 // Funções para comunicação com o servidor
 const fetchAccounts = async () => {
@@ -93,13 +103,22 @@ const renderTransactions = (transactions) => {
         const sign = transaction.type === 'income' ? '+' : '-';
         const className = transaction.type === 'income' ? 'text-success' : 'text-danger';
         
-        const formattedDate = formatDateTime(transaction.created_at);
+        const createdDate = `Criado: ${formatDateForDisplay(transaction.created_at)}`;
+        const dueDate = `Vencimento: ${formatDateForDisplay(transaction.due_date)}`;
+        let confirmedDate = '';
+        if (transaction.is_confirmed) {
+            confirmedDate = `Confirmado: ${formatDateForDisplay(transaction.confirmed_at)}`;
+        }
 
         li.innerHTML = `
             <div>
-                <span class="d-block text-muted" style="font-size: 0.8em;">${formattedDate}</span>
-                <span>[${transaction.account_name}] ${transaction.description}</span>
-                <span class="${className} fw-bold ms-2">${sign} R$ ${transaction.amount.toFixed(2)}</span>
+                <span class="d-block text-muted" style="font-size: 0.8em;">
+                    ${createdDate} | ${dueDate} ${confirmedDate ? '| ' + confirmedDate : ''}
+                </span>
+                <span>
+                    [${transaction.account_name}] ${transaction.description}
+                    <span class="${className} fw-bold ms-2">${sign} R$ ${transaction.amount.toFixed(2)}</span>
+                </span>
             </div>
             <div class="d-flex align-items-center transaction-buttons">
                 <button class="icon-button edit-button" data-id="${transaction.id}" title="Editar"><i class="fas fa-pencil-alt"></i></button>
@@ -193,10 +212,11 @@ const handleTransactionFormSubmit = async (e) => {
     const amount = parseFloat(amountInput.value);
     const type = typeInput.value;
     const account_id = accountSelect.value;
+    const due_date = transactionDateInput.value;
 
-    if (!description || !amount || !account_id) return;
+    if (!description || !amount || !account_id || !due_date) return;
 
-    const transactionData = { description, amount, type, account_id };
+    const transactionData = { description, amount, type, account_id, due_date };
 
     if (transactionId) {
         // Lógica de edição
@@ -229,6 +249,7 @@ const handleTransactionFormSubmit = async (e) => {
 
         if (response.ok) {
             transactionForm.reset();
+            resetForm();
             fetchTransactions();
         } else {
             alert('Erro ao adicionar transação.');
@@ -249,6 +270,9 @@ const editTransaction = async (id) => {
         typeInput.value = transaction.type;
         accountSelect.value = transaction.account_id;
         transactionIdInput.value = transaction.id;
+        // Pega apenas a parte da data, ignorando a hora
+        transactionDateInput.value = transaction.due_date ? transaction.due_date.split('T')[0] : getTodayDate();
+        transactionDateDisplayInput.value = formatDateForDisplay(transaction.due_date ? transaction.due_date.split('T')[0] : getTodayDate());
         formTitle.textContent = 'Editar Transação';
         submitButton.textContent = 'Atualizar';
     } else {
@@ -342,6 +366,8 @@ const resetForm = () => {
     transactionIdInput.value = '';
     formTitle.textContent = 'Adicionar Transação';
     submitButton.textContent = 'Adicionar';
+    transactionDateInput.value = getTodayDate();
+    transactionDateDisplayInput.value = formatDateForDisplay(getTodayDate());
 };
 
 const handleLogin = async (e) => {
@@ -359,8 +385,10 @@ const handleLogin = async (e) => {
 
     if (response.ok) {
         userId = data.userId;
+        localStorage.setItem('userId', data.userId);
         loginScreen.classList.add('hidden');
         mainApp.classList.remove('hidden');
+        resetForm();
         fetchAccounts();
     } else {
         errorMessage.classList.remove('hidden');
@@ -368,6 +396,7 @@ const handleLogin = async (e) => {
 };
 
 const logout = () => {
+    localStorage.removeItem('userId');
     userId = null;
     allAccounts = [];
     loginScreen.classList.remove('hidden');
@@ -380,6 +409,17 @@ const logout = () => {
     totalIncomeEl.textContent = 'R$ 0,00';
     totalExpenseEl.textContent = 'R$ 0,00';
     balanceEl.textContent = 'R$ 0,00';
+};
+
+const init = () => {
+    const savedUserId = localStorage.getItem('userId');
+    if (savedUserId) {
+        userId = savedUserId;
+        loginScreen.classList.add('hidden');
+        mainApp.classList.remove('hidden');
+        resetForm();
+        fetchAccounts();
+    }
 };
 
 // Listeners de eventos
@@ -408,3 +448,12 @@ accountsSummaryList.addEventListener('click', (e) => {
         deleteAccount(id, name);
     }
 });
+// Evento para atualizar o campo de exibição quando a data é selecionada
+transactionDateInput.addEventListener('change', () => {
+    transactionDateDisplayInput.value = formatDateForDisplay(transactionDateInput.value);
+});
+calendarIconBtn.addEventListener('click', () => {
+    transactionDateInput.showPicker();
+});
+
+init();

@@ -66,3 +66,16 @@
 .delete-account-button:hover {
     background-color: #c82333;
 }
+
+/* Estilo para o ícone de calendário */
+.calendar-icon-btn {
+    cursor: pointer;
+    background-color: #e9ecef;
+    border: 1px solid #ced4da;
+    color: #495057;
+    transition: background-color 0.3s ease;
+}
+
+.calendar-icon-btn:hover {
+    background-color: #d7d8d9;
+}

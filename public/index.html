@@ -80,6 +80,16 @@
                                 <option value="expense">Despesa</option>
                             </select>
                         </div>
+                        
+                        <div class="mb-3">
+                            <label for="transaction-date" class="form-label">Data da Transação:</label>
+                            <div class="input-group">
+                                <span class="input-group-text calendar-icon-btn"><i class="fas fa-calendar-alt"></i></span>
+                                <input type="date" class="form-control d-none" id="transaction-date" required>
+                                <input type="text" class="form-control" id="transaction-date-display" readonly>
+                            </div>
+                        </div>
+
                         <button type="submit" id="submit-button" class="btn btn-primary w-100">Adicionar</button>
                     </form>
                 </div>

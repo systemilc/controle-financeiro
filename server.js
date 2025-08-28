@@ -40,7 +40,7 @@ db.serialize(() => {
         )
     `);
 
-    // Tabela para as transações, com novas colunas
+    // Tabela para as transações, com as três colunas de data
     db.run(`
         CREATE TABLE IF NOT EXISTS transactions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -52,6 +52,8 @@ db.serialize(() => {
             original_account_name TEXT,
             is_confirmed INTEGER DEFAULT 0,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            due_date TEXT,
+            confirmed_at TEXT DEFAULT NULL,
             FOREIGN KEY(user_id) REFERENCES users(id),
             FOREIGN KEY(account_id) REFERENCES accounts(id)
         )
@@ -179,18 +181,18 @@ app.delete('/api/accounts/:id', authenticate, (req, res) => {
 
 // Transações: Adicionar uma nova transação
 app.post('/api/transactions', authenticate, (req, res) => {
-    const { description, amount, type, account_id } = req.body;
+    const { description, amount, type, account_id, due_date } = req.body;
     const userId = req.userId;
-    if (!account_id) {
-        return res.status(400).json({ message: 'O ID da conta é obrigatório.' });
+    if (!account_id || !due_date) {
+        return res.status(400).json({ message: 'O ID da conta e a data de vencimento são obrigatórios.' });
     }
-    db.run(`INSERT INTO transactions (user_id, account_id, description, amount, type) VALUES (?, ?, ?, ?, ?)`,
-        [userId, account_id, description, amount, type],
+    db.run(`INSERT INTO transactions (user_id, account_id, description, amount, type, due_date) VALUES (?, ?, ?, ?, ?, ?)`,
+        [userId, account_id, description, amount, type, due_date],
         function (err) {
             if (err) {
                 return res.status(500).json({ message: 'Erro ao adicionar transação', error: err.message });
             }
-            res.status(201).json({ id: this.lastID, description, amount, type, account_id });
+            res.status(201).json({ id: this.lastID, description, amount, type, account_id, due_date, created_at: new Date().toISOString() });
         }
     );
 });
@@ -200,7 +202,7 @@ app.put('/api/transactions/:id/confirm', authenticate, (req, res) => {
     const { id } = req.params;
     const userId = req.userId;
 
-    db.run(`UPDATE transactions SET is_confirmed = 1 WHERE id = ? AND user_id = ?`,
+    db.run(`UPDATE transactions SET is_confirmed = 1, confirmed_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?`,
         [id, userId],
         function(err) {
             if (err) {
@@ -265,10 +267,10 @@ app.get('/api/transactions/:id', authenticate, (req, res) => {
 // Transações: Atualizar uma transação
 app.put('/api/transactions/:id', authenticate, (req, res) => {
     const { id } = req.params;
-    const { description, amount, type, account_id } = req.body;
+    const { description, amount, type, account_id, due_date } = req.body;
     const userId = req.userId;
-    db.run(`UPDATE transactions SET description = ?, amount = ?, type = ?, account_id = ? WHERE id = ? AND user_id = ?`,
-        [description, amount, type, account_id, id, userId],
+    db.run(`UPDATE transactions SET description = ?, amount = ?, type = ?, account_id = ?, due_date = ? WHERE id = ? AND user_id = ?`,
+        [description, amount, type, account_id, due_date, id, userId],
         function (err) {
             if (err) {
                 return res.status(500).json({ message: 'Erro ao atualizar transação', error: err.message });
