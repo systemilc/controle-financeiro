@@ -27,6 +27,10 @@ export const elements = {
     totalExpenseEl: document.getElementById('total-expense'),
     balanceEl: document.getElementById('balance'),
     logoutButton: document.getElementById('logout-button'),
+    addUserForm: document.getElementById('add-user-form'),
+    newUsernameInput: document.getElementById('new-username'),
+    newPasswordInput: document.getElementById('new-password'),
+    groupUsersList: document.getElementById('group-users-list'),
 };
 
 export const render = {
@@ -39,11 +43,20 @@ export const render = {
             const sign = transaction.type === 'income' ? '+' : '-';
             const className = transaction.type === 'income' ? 'text-success' : 'text-danger';
             
+            console.log('--- Renderizando Transação ---');
+            console.log('Data de criação (raw):', transaction.created_at);
+            console.log('Data de vencimento (raw):', transaction.due_date);
+
             const createdDate = `Criado: ${formatDateForDisplay(transaction.created_at)}`;
             const dueDate = `Vencimento: ${formatDateForDisplay(transaction.due_date)}`;
             let confirmedDate = '';
             if (transaction.is_confirmed) {
                 confirmedDate = `Confirmado: ${formatDateForDisplay(transaction.confirmed_at)}`;
+            }
+            
+            let creatorInfo = '';
+            if (transaction.creator_name) {
+                creatorInfo = ` <span class="badge bg-secondary">${transaction.creator_name}</span>`;
             }
 
             li.innerHTML = `
@@ -52,7 +65,7 @@ export const render = {
                         ${createdDate} | ${dueDate} ${confirmedDate ? '| ' + confirmedDate : ''}
                     </span>
                     <span>
-                        [${transaction.account_name}] ${transaction.description}
+                        [${transaction.account_name}] ${transaction.description}${creatorInfo}
                         <span class="${className} fw-bold ms-2">${sign} R$ ${transaction.amount.toFixed(2)}</span>
                     </span>
                 </div>
@@ -81,7 +94,6 @@ export const render = {
         });
 
         transactions.forEach(transaction => {
-            // Apenas contabiliza transações confirmadas
             if (transaction.is_confirmed) {
                 if (transaction.type === 'income') {
                     totalIncome += transaction.amount;
@@ -117,16 +129,6 @@ export const render = {
         }
     },
 
-    resetForm: () => {
-        elements.transactionForm.reset();
-        elements.transactionIdInput.value = '';
-        elements.formTitle.textContent = 'Adicionar Transação';
-        elements.submitButton.textContent = 'Adicionar';
-        const today = getTodayDate();
-        elements.transactionDateInput.value = today;
-        elements.transactionDateDisplayInput.value = formatDateForDisplay(today);
-    },
-
     populateAccountSelect: () => {
         elements.accountSelect.innerHTML = '';
         state.allAccounts.forEach(account => {
@@ -135,6 +137,26 @@ export const render = {
             option.textContent = `ID ${account.id} - ${account.name}`;
             elements.accountSelect.appendChild(option);
         });
+    },
+
+    renderGroupUsers: (users) => {
+        elements.groupUsersList.innerHTML = '';
+        users.forEach(user => {
+            const li = document.createElement('li');
+            li.classList.add('list-group-item');
+            li.textContent = `ID ${user.id} - ${user.username}`;
+            elements.groupUsersList.appendChild(li);
+        });
+    },
+
+    resetForm: () => {
+        elements.transactionForm.reset();
+        elements.transactionIdInput.value = '';
+        elements.formTitle.textContent = 'Adicionar Transação';
+        elements.submitButton.textContent = 'Adicionar';
+        const today = getTodayDate();
+        elements.transactionDateInput.value = today;
+        elements.transactionDateDisplayInput.value = formatDateForDisplay(today);
     },
 
     showLoginScreen: () => {

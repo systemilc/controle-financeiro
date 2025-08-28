@@ -1,9 +1,15 @@
 import { state } from './state.js';
 
-const headers = () => ({
-    'Content-Type': 'application/json',
-    'X-User-Id': state.userId,
-});
+const headers = () => {
+    const apiHeaders = {
+        'Content-Type': 'application/json',
+        'X-User-Id': state.userId,
+        'X-Group-Id': state.groupId,
+    };
+    console.log('--- Headers da API ---');
+    console.log(apiHeaders);
+    return apiHeaders;
+};
 
 export const api = {
     login: async (username, password) => {
@@ -80,5 +86,19 @@ export const api = {
     fetchSingleTransaction: async (id) => {
         const response = await fetch(`/api/transactions/${id}`, { headers: headers() });
         return await response.json();
+    },
+
+    fetchGroupUsers: async () => {
+        const response = await fetch('/api/users/list', { headers: headers() });
+        return await response.json();
+    },
+
+    addUserToGroup: async (username, password) => {
+        const response = await fetch('/api/users/add', {
+            method: 'POST',
+            headers: headers(),
+            body: JSON.stringify({ username, password }),
+        });
+        return response;
     },
 };

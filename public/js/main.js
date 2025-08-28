@@ -3,36 +3,36 @@ import { api } from './api.js';
 import { elements, render } from './ui.js';
 import { getTodayDate } from './utils.js';
 
-// Funções de inicialização e controle do app
-const fetchAccounts = async () => {
+const fetchAllData = async () => {
     try {
-        const data = await api.fetchAccounts();
-        if (Array.isArray(data)) {
-            state.allAccounts = data;
+        const accountsData = await api.fetchAccounts();
+        if (Array.isArray(accountsData)) {
+            state.allAccounts = accountsData;
             render.populateAccountSelect();
-            fetchTransactions();
         } else {
-            console.error('Erro ao carregar contas:', data.message);
+            console.error('Erro ao carregar contas:', accountsData.message);
         }
-    } catch (error) {
-        console.error('Erro de rede:', error);
-    }
-};
 
-const fetchTransactions = async () => {
-    try {
-        const data = await api.fetchTransactions();
-        if (Array.isArray(data)) {
-            render.transactions(data);
-            render.calculateBalances(data);
+        const transactionsData = await api.fetchTransactions();
+        if (Array.isArray(transactionsData)) {
+            render.transactions(transactionsData);
+            render.calculateBalances(transactionsData);
         } else {
-            console.error('Erro ao carregar transações:', data.message);
+            console.error('Erro ao carregar transações:', transactionsData.message);
             alert('Erro ao carregar transações. Faça login novamente.');
             logout();
         }
+
+        const usersData = await api.fetchGroupUsers();
+        if (Array.isArray(usersData)) {
+            render.renderGroupUsers(usersData);
+        } else {
+            console.error('Erro ao carregar usuários:', usersData.message);
+        }
     } catch (error) {
-        console.error('Erro de rede:', error);
+        console.error('Erro de rede ao buscar dados:', error);
         alert('Erro de conexão. Tente novamente.');
+        logout();
     }
 };
 
@@ -44,7 +44,7 @@ const handleAccountFormSubmit = async (e) => {
     const success = await api.createAccount(accountName);
     if (success) {
         elements.accountNameInput.value = '';
-        fetchAccounts();
+        fetchAllData();
     } else {
         alert('Erro ao adicionar conta.');
     }
@@ -67,7 +67,7 @@ const handleTransactionFormSubmit = async (e) => {
         const success = await api.editTransaction(transactionId, transactionData);
         if (success) {
             render.resetForm();
-            fetchTransactions();
+            fetchAllData();
         } else {
             alert('Erro ao atualizar transação.');
         }
@@ -75,7 +75,7 @@ const handleTransactionFormSubmit = async (e) => {
         const success = await api.createTransaction(transactionData);
         if (success) {
             render.resetForm();
-            fetchTransactions();
+            fetchAllData();
         } else {
             alert('Erro ao adicionar transação.');
         }
@@ -104,7 +104,7 @@ const deleteTransaction = async (id) => {
     if (!confirm('Tem certeza que deseja deletar esta transação?')) return;
     const success = await api.deleteTransaction(id);
     if (success) {
-        fetchTransactions();
+        fetchAllData();
     } else {
         alert('Erro ao deletar transação.');
     }
@@ -113,7 +113,7 @@ const deleteTransaction = async (id) => {
 const confirmTransaction = async (id) => {
     const success = await api.confirmTransaction(id);
     if (success) {
-        fetchTransactions();
+        fetchAllData();
     } else {
         alert('Erro ao confirmar transação.');
     }
@@ -153,7 +153,7 @@ const deleteAccount = async (id, name) => {
 
     const response = await api.deleteAccount(id, newAccount.id, name);
     if (response.ok) {
-        fetchAccounts();
+        fetchAllData();
         alert('Conta deletada e transações transferidas com sucesso.');
     } else {
         const error = await response.json();
@@ -161,14 +161,33 @@ const deleteAccount = async (id, name) => {
     }
 };
 
+const handleAddUserFormSubmit = async (e) => {
+    e.preventDefault();
+    const username = elements.newUsernameInput.value;
+    const password = elements.newPasswordInput.value;
+    if (!username || !password) return;
+    
+    const response = await api.addUserToGroup(username, password);
+    if (response.ok) {
+        elements.newUsernameInput.value = '';
+        elements.newPasswordInput.value = '';
+        fetchAllData();
+        alert('Usuário adicionado ao grupo com sucesso!');
+    } else {
+        const error = await response.json();
+        alert(`Erro ao adicionar usuário: ${error.message}`);
+    }
+};
+
+
 const handleLogin = async (e) => {
     e.preventDefault();
     const username = elements.usernameInput.value;
     const password = elements.passwordInput.value;
 
-    console.log('Tentando fazer login...');
-    console.log('Username:', username);
-    console.log('Password:', password);
+    console.log('--- Tentando fazer login ---');
+    console.log('Username enviado:', username);
+    console.log('Password enviado:', password);
 
     try {
         const data = await api.login(username, password);
@@ -177,10 +196,12 @@ const handleLogin = async (e) => {
 
         if (data.userId) {
             state.userId = data.userId;
+            state.groupId = data.groupId;
             localStorage.setItem('userId', data.userId);
+            localStorage.setItem('groupId', data.groupId);
             render.showMainApp();
             render.resetForm();
-            fetchAccounts();
+            fetchAllData();
         } else {
             render.showLoginError('Usuário ou senha incorretos. Tente novamente.');
         }
@@ -192,7 +213,9 @@ const handleLogin = async (e) => {
 
 const logout = () => {
     localStorage.removeItem('userId');
+    localStorage.removeItem('groupId');
     state.userId = null;
+    state.groupId = null;
     state.allAccounts = [];
     render.showLoginScreen();
     elements.usernameInput.value = '';
@@ -207,12 +230,19 @@ const logout = () => {
 };
 
 const init = () => {
+    console.log('--- Inicializando a aplicação ---');
     const savedUserId = localStorage.getItem('userId');
-    if (savedUserId) {
+    const savedGroupId = localStorage.getItem('groupId');
+
+    console.log('userId no localStorage:', savedUserId);
+    console.log('groupId no localStorage:', savedGroupId);
+
+    if (savedUserId && savedGroupId) {
         state.userId = savedUserId;
+        state.groupId = savedGroupId;
         render.showMainApp();
         render.resetForm();
-        fetchAccounts();
+        fetchAllData();
     }
 };
 
@@ -221,6 +251,7 @@ elements.loginForm.addEventListener('submit', handleLogin);
 elements.accountForm.addEventListener('submit', handleAccountFormSubmit);
 elements.transactionForm.addEventListener('submit', handleTransactionFormSubmit);
 elements.logoutButton.addEventListener('click', logout);
+elements.addUserForm.addEventListener('submit', handleAddUserFormSubmit);
 
 elements.transactionList.addEventListener('click', (e) => {
     if (e.target.closest('.edit-button')) {

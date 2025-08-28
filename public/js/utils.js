@@ -11,12 +11,20 @@ export const formatDateForDisplay = (dateString) => {
 
     let date;
     try {
-        // Se a string for completa (com 'T'), usa a data completa
-        if (dateString.includes('T')) {
+        if (dateString.includes('Z')) {
+            // Formato ISO completo já em UTC
             date = new Date(dateString);
-        } else {
-            // Se for apenas a data (AAAA-MM-DD), usa o formato local
+        } else if (dateString.includes('T')) {
+            // Formato ISO sem fuso horário. Assume-se local.
             date = new Date(dateString);
+        } else if (dateString.includes(' ')) {
+            // Formato do SQLite (e.g., '2025-08-27 10:30:00').
+            // Adiciona um Z para tratar como UTC e converter para o fuso local.
+            date = new Date(dateString.replace(' ', 'T') + 'Z');
+        }
+        else {
+            // Formato YYYY-MM-DD. Adiciona um tempo para evitar erro de fuso horário.
+            date = new Date(dateString + 'T12:00:00');
         }
         
         if (isNaN(date.getTime())) {

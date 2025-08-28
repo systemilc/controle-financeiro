@@ -47,6 +47,22 @@
                     <h2 class="text-primary">Saldos por Conta (Líquido)</h2>
                     <ul id="accounts-summary-list" class="list-group list-group-flush"></ul>
                 </div>
+
+                <div class="card p-3 shadow-sm mt-3">
+                    <h2 class="text-primary">Usuários do Grupo</h2>
+                    <ul id="group-users-list" class="list-group list-group-flush"></ul>
+                    <form id="add-user-form" class="mt-3">
+                        <div class="mb-3">
+                            <label for="new-username" class="form-label">Nome do novo usuário:</label>
+                            <input type="text" class="form-control" id="new-username" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="new-password" class="form-label">Senha:</label>
+                            <input type="password" class="form-control" id="new-password" required>
+                        </div>
+                        <button type="submit" class="btn btn-secondary w-100">Adicionar ao Grupo</button>
+                    </form>
+                </div>
             </div>
 
             <div class="col-md-6 mb-4">

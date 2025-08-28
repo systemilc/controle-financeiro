@@ -19,28 +19,25 @@ const db = new sqlite3.Database('financas.db', (err) => {
     console.log('Conectado ao banco de dados SQLite.');
 });
 
-// Cria as tabelas se elas não existirem
+// Atualiza a estrutura do banco de dados para a nova lógica
 db.serialize(() => {
-    // Tabela para o usuário
     db.run(`
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE,
-            password TEXT
+            password TEXT,
+            group_id INTEGER
         )
     `);
 
-    // Tabela para contas bancárias
     db.run(`
         CREATE TABLE IF NOT EXISTS accounts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
             name TEXT,
-            FOREIGN KEY(user_id) REFERENCES users(id)
+            group_id INTEGER
         )
     `);
-
-    // Tabela para as transações, com novas colunas
+    
     db.run(`
         CREATE TABLE IF NOT EXISTS transactions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -59,12 +56,50 @@ db.serialize(() => {
         )
     `);
 
+    // Altera a tabela de usuários para adicionar a coluna group_id se ela não existir
+    db.all(`PRAGMA table_info(users)`, (err, tableInfo) => {
+        if (!tableInfo || !Array.isArray(tableInfo) || !tableInfo.some(col => col.name === 'group_id')) {
+            db.run(`ALTER TABLE users ADD COLUMN group_id INTEGER`, (err) => {
+                if (err) {
+                    console.error('Erro ao adicionar group_id na tabela users:', err.message);
+                }
+            });
+        }
+    });
+
+    // Altera a tabela de contas para adicionar a coluna group_id e remover user_id
+    db.all(`PRAGMA table_info(accounts)`, (err, tableInfo) => {
+        if (!tableInfo || !Array.isArray(tableInfo) || !tableInfo.some(col => col.name === 'group_id')) {
+            db.run(`ALTER TABLE accounts ADD COLUMN group_id INTEGER`, (err) => {
+                if (err) {
+                    console.error('Erro ao adicionar group_id na tabela accounts:', err.message);
+                }
+            });
+            // Opcional: remover a coluna user_id se ela existir. Para simplificar, não faremos isso agora.
+        }
+    });
+    
+    // Altera a tabela de transações para adicionar as colunas se elas não existirem
+    const transactionColumns = ['original_account_name', 'is_confirmed', 'created_at', 'due_date', 'confirmed_at'];
+    transactionColumns.forEach(col => {
+        db.all(`PRAGMA table_info(transactions)`, (err, tableInfo) => {
+            if (!tableInfo || !Array.isArray(tableInfo) || !tableInfo.some(c => c.name === col)) {
+                db.run(`ALTER TABLE transactions ADD COLUMN ${col} TEXT`, (err) => {
+                    if (err) {
+                        console.error(`Erro ao adicionar a coluna ${col} em transactions:`, err.message);
+                    }
+                });
+            }
+        });
+    });
+
     // Insere um usuário de exemplo se não existir
     db.get("SELECT * FROM users WHERE username = 'admin'", (err, row) => {
         if (!row) {
             bcrypt.hash('123456', SALT_ROUNDS, (err, hash) => {
                 if (err) throw err;
-                db.run(`INSERT INTO users (username, password) VALUES (?, ?)`, ['admin', hash], (err) => {
+                const groupId = 1; // Cria o primeiro grupo para o admin
+                db.run(`INSERT INTO users (username, password, group_id) VALUES (?, ?, ?)`, ['admin', hash, groupId], (err) => {
                     if (err) {
                         console.error('Erro ao inserir usuário padrão:', err.message);
                     } else {
@@ -76,19 +111,26 @@ db.serialize(() => {
     });
 });
 
-// Autenticação de usuário (middleware)
 const authenticate = (req, res, next) => {
     const userId = req.headers['x-user-id'];
-    if (!userId) {
+    const groupId = req.headers['x-group-id'];
+    
+    console.log('--- Auth Middleware ---');
+    console.log('Recebido User ID:', userId);
+    console.log('Recebido Group ID:', groupId);
+
+    if (!userId || !groupId) {
+        console.log('Autenticação falhou: userId ou groupId ausentes.');
         return res.status(401).json({ message: 'Não autorizado' });
     }
     req.userId = userId;
+    req.groupId = groupId;
+    console.log('Autenticação bem-sucedida.');
     next();
 };
 
 // --- ROTAS DA API ---
 
-// Login
 app.post('/api/login', (req, res) => {
     const { username, password } = req.body;
     db.get("SELECT * FROM users WHERE username = ?", [username], async (err, user) => {
@@ -97,18 +139,44 @@ app.post('/api/login', (req, res) => {
         }
         const match = await bcrypt.compare(password, user.password);
         if (match) {
-            return res.json({ message: 'Login bem-sucedido', userId: user.id });
+            return res.json({ message: 'Login bem-sucedido', userId: user.id, groupId: user.group_id });
         } else {
             return res.status(400).json({ message: 'Usuário ou senha inválidos' });
         }
     });
 });
 
-// Contas: Criar uma nova conta
+app.post('/api/users/add', authenticate, (req, res) => {
+    const { username, password } = req.body;
+    const groupId = req.groupId;
+
+    bcrypt.hash(password, SALT_ROUNDS, (err, hash) => {
+        if (err) {
+            return res.status(500).json({ message: 'Erro ao criar usuário', error: err.message });
+        }
+        db.run(`INSERT INTO users (username, password, group_id) VALUES (?, ?, ?)`, [username, hash, groupId], (err) => {
+            if (err) {
+                return res.status(400).json({ message: 'Usuário já existe ou erro no banco.', error: err.message });
+            }
+            res.status(201).json({ message: 'Novo usuário adicionado ao grupo com sucesso.' });
+        });
+    });
+});
+
+app.get('/api/users/list', authenticate, (req, res) => {
+    const groupId = req.groupId;
+    db.all(`SELECT id, username FROM users WHERE group_id = ?`, [groupId], (err, rows) => {
+        if (err) {
+            return res.status(500).json({ message: 'Erro ao buscar usuários', error: err.message });
+        }
+        res.json(rows);
+    });
+});
+
 app.post('/api/accounts', authenticate, (req, res) => {
     const { name } = req.body;
-    const userId = req.userId;
-    db.run(`INSERT INTO accounts (user_id, name) VALUES (?, ?)`, [userId, name], function(err) {
+    const groupId = req.groupId;
+    db.run(`INSERT INTO accounts (group_id, name) VALUES (?, ?)`, [groupId, name], function(err) {
         if (err) {
             return res.status(500).json({ message: 'Erro ao criar conta', error: err.message });
         }
@@ -116,28 +184,31 @@ app.post('/api/accounts', authenticate, (req, res) => {
     });
 });
 
-// Contas: Listar contas do usuário
 app.get('/api/accounts', authenticate, (req, res) => {
-    const userId = req.userId;
-    db.all(`SELECT * FROM accounts WHERE user_id = ?`, [userId], (err, rows) => {
+    const groupId = req.groupId;
+    
+    console.log('--- GET /api/accounts ---');
+    console.log('Buscando contas para o Group ID:', groupId);
+
+    db.all(`SELECT * FROM accounts WHERE group_id = ?`, [groupId], (err, rows) => {
         if (err) {
+            console.error('Erro no banco de dados:', err.message);
             return res.status(500).json({ message: 'Erro ao buscar contas', error: err.message });
         }
         res.json(rows);
     });
 });
 
-// Contas: Deletar uma conta e transferir suas transações
 app.delete('/api/accounts/:id', authenticate, (req, res) => {
     const { id } = req.params;
     const { new_account_id, original_account_name } = req.body;
-    const userId = req.userId;
+    const groupId = req.groupId;
 
     if (parseInt(id) === parseInt(new_account_id)) {
         return res.status(400).json({ message: 'Não é possível transferir transações para a mesma conta.' });
     }
 
-    db.get(`SELECT COUNT(*) as count FROM accounts WHERE user_id = ?`, [userId], (err, row) => {
+    db.get(`SELECT COUNT(*) as count FROM accounts WHERE group_id = ?`, [groupId], (err, row) => {
         if (err) {
             return res.status(500).json({ message: 'Erro ao verificar contas', error: err.message });
         }
@@ -147,17 +218,14 @@ app.delete('/api/accounts/:id', authenticate, (req, res) => {
 
         db.serialize(() => {
             db.run("BEGIN TRANSACTION;");
-
-            // Atualiza as transações para a nova conta e salva o nome da conta original
-            db.run(`UPDATE transactions SET account_id = ?, original_account_name = ? WHERE account_id = ? AND user_id = ?`,
-                [new_account_id, original_account_name, id, userId],
+            db.run(`UPDATE transactions SET account_id = ?, original_account_name = ? WHERE account_id = ?`,
+                [new_account_id, original_account_name, id],
                 function(err) {
                     if (err) {
                         db.run("ROLLBACK;");
                         return res.status(500).json({ message: 'Erro ao transferir transações', error: err.message });
                     }
-                    // Deleta a conta antiga
-                    db.run(`DELETE FROM accounts WHERE id = ? AND user_id = ?`, [id, userId], function(err) {
+                    db.run(`DELETE FROM accounts WHERE id = ? AND group_id = ?`, [id, groupId], function(err) {
                         if (err) {
                             db.run("ROLLBACK;");
                             return res.status(500).json({ message: 'Erro ao deletar conta', error: err.message });
@@ -179,7 +247,6 @@ app.delete('/api/accounts/:id', authenticate, (req, res) => {
     });
 });
 
-// Transações: Adicionar uma nova transação
 app.post('/api/transactions', authenticate, (req, res) => {
     const { description, amount, type, account_id, due_date } = req.body;
     const userId = req.userId;
@@ -197,40 +264,49 @@ app.post('/api/transactions', authenticate, (req, res) => {
     );
 });
 
-// Transações: Rota para confirmar uma transação
 app.put('/api/transactions/:id/confirm', authenticate, (req, res) => {
     const { id } = req.params;
     const userId = req.userId;
+    
+    console.log('--- PUT /api/transactions/:id/confirm ---');
+    console.log('Confirmando transação com ID:', id);
+    console.log('User ID do header:', userId);
 
     db.run(`UPDATE transactions SET is_confirmed = 1, confirmed_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?`,
         [id, userId],
         function(err) {
             if (err) {
+                console.error('Erro no banco de dados:', err.message);
                 return res.status(500).json({ message: 'Erro ao confirmar transação', error: err.message });
             }
             if (this.changes === 0) {
+                console.log('Transação não encontrada ou sem permissão.');
                 return res.status(404).json({ message: 'Transação não encontrada ou sem permissão' });
             }
+            console.log('Transação confirmada com sucesso.');
             res.status(200).json({ message: 'Transação confirmada com sucesso' });
         }
     );
 });
 
-
-// Transações: Listar todas as transações do usuário (agrupando por conta)
 app.get('/api/transactions', authenticate, (req, res) => {
-    const userId = req.userId;
+    const groupId = req.groupId;
+    
+    console.log('--- GET /api/transactions ---');
+    console.log('Buscando transações para o Group ID:', groupId);
+
     db.all(`
-        SELECT t.*, a.name as account_name
+        SELECT t.*, a.name as account_name, u.username as creator_name
         FROM transactions t
         LEFT JOIN accounts a ON t.account_id = a.id
-        WHERE t.user_id = ?
+        LEFT JOIN users u ON t.user_id = u.id
+        WHERE a.group_id = ?
         ORDER BY t.id DESC
-    `, [userId], (err, rows) => {
+    `, [groupId], (err, rows) => {
         if (err) {
+            console.error('Erro no banco de dados:', err.message);
             return res.status(500).json({ message: 'Erro ao buscar transações', error: err.message });
         }
-        // Se a conta de origem foi deletada, o nome da conta original será usado.
         rows.forEach(row => {
             if (!row.account_name && row.original_account_name) {
                 row.account_name = row.original_account_name + ' (Excluída)';
@@ -240,31 +316,22 @@ app.get('/api/transactions', authenticate, (req, res) => {
     });
 });
 
-// Transações: Buscar uma única transação
-app.get('/api/transactions/:id', authenticate, (req, res) => {
-    const { id } = req.params;
-    const userId = req.userId;
-    db.get(`
-        SELECT t.*, a.name as account_name
-        FROM transactions t
-        LEFT JOIN accounts a ON t.account_id = a.id
-        WHERE t.id = ? AND t.user_id = ?
-    `, [id, userId], (err, row) => {
+app.get('/api/accounts', authenticate, (req, res) => {
+    const groupId = req.groupId;
+    
+    console.log('--- GET /api/accounts ---');
+    console.log('Buscando contas para o Group ID:', groupId);
+
+    db.all(`SELECT * FROM accounts WHERE group_id = ?`, [groupId], (err, rows) => {
         if (err) {
-            return res.status(500).json({ message: 'Erro ao buscar transação', error: err.message });
+            console.error('Erro no banco de dados:', err.message);
+            return res.status(500).json({ message: 'Erro ao buscar contas', error: err.message });
         }
-        if (!row) {
-            return res.status(404).json({ message: 'Transação não encontrada' });
-        }
-        // Se a conta de origem foi deletada, o nome da conta original será usado.
-        if (!row.account_name && row.original_account_name) {
-            row.account_name = row.original_account_name + ' (Excluída)';
-        }
-        res.json(row);
+        res.json(rows);
     });
 });
 
-// Transações: Atualizar uma transação
+
 app.put('/api/transactions/:id', authenticate, (req, res) => {
     const { id } = req.params;
     const { description, amount, type, account_id, due_date } = req.body;
@@ -283,7 +350,6 @@ app.put('/api/transactions/:id', authenticate, (req, res) => {
     );
 });
 
-// Transações: Deletar uma transação
 app.delete('/api/transactions/:id', authenticate, (req, res) => {
     const { id } = req.params;
     const userId = req.userId;
@@ -298,7 +364,6 @@ app.delete('/api/transactions/:id', authenticate, (req, res) => {
     });
 });
 
-// Inicia o servidor
 app.listen(PORT, () => {
     console.log(`Servidor rodando em http://localhost:${PORT}`);
 });
