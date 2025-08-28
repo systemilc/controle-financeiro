@@ -1,6 +1,7 @@
 const loginScreen = document.getElementById('login-screen');
 const mainApp = document.getElementById('main-app');
 const loginForm = document.getElementById('login-form');
+const usernameInput = document.getElementById('username');
 const passwordInput = document.getElementById('password');
 const errorMessage = document.getElementById('error-message');
 const accountForm = document.getElementById('account-form');
@@ -29,8 +30,16 @@ let allAccounts = [];
 // Funções utilitárias
 const formatDateForDisplay = (dateString) => {
     if (!dateString) return 'Data Inválida';
-    // O construtor de data sem o tempo usa o fuso horário local, resolvendo o problema
-    const date = new Date(dateString);
+
+    let date;
+    // Verifica se a string é apenas a data (YYYY-MM-DD) ou a data completa (ISO)
+    if (dateString.includes('T')) {
+        date = new Date(dateString);
+    } else {
+        // Se for apenas a data, adiciona um fuso horário para evitar o erro de 1 dia
+        date = new Date(dateString + 'T12:00:00');
+    }
+    
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const year = date.getFullYear();
@@ -270,9 +279,9 @@ const editTransaction = async (id) => {
         typeInput.value = transaction.type;
         accountSelect.value = transaction.account_id;
         transactionIdInput.value = transaction.id;
-        // Pega apenas a parte da data, ignorando a hora
-        transactionDateInput.value = transaction.due_date ? transaction.due_date.split('T')[0] : getTodayDate();
-        transactionDateDisplayInput.value = formatDateForDisplay(transaction.due_date ? transaction.due_date.split('T')[0] : getTodayDate());
+        const displayDate = transaction.due_date ? transaction.due_date : getTodayDate();
+        transactionDateInput.value = displayDate;
+        transactionDateDisplayInput.value = formatDateForDisplay(displayDate);
         formTitle.textContent = 'Editar Transação';
         submitButton.textContent = 'Atualizar';
     } else {
@@ -372,7 +381,7 @@ const resetForm = () => {
 
 const handleLogin = async (e) => {
     e.preventDefault();
-    const username = 'admin';
+    const username = usernameInput.value;
     const password = passwordInput.value;
 
     const response = await fetch('/api/login', {
@@ -401,6 +410,7 @@ const logout = () => {
     allAccounts = [];
     loginScreen.classList.remove('hidden');
     mainApp.classList.add('hidden');
+    usernameInput.value = '';
     passwordInput.value = '';
     errorMessage.classList.add('hidden');
     resetForm();

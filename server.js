@@ -40,7 +40,7 @@ db.serialize(() => {
         )
     `);
 
-    // Tabela para as transações, com as três colunas de data
+    // Tabela para as transações, com novas colunas
     db.run(`
         CREATE TABLE IF NOT EXISTS transactions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -62,7 +62,7 @@ db.serialize(() => {
     // Insere um usuário de exemplo se não existir
     db.get("SELECT * FROM users WHERE username = 'admin'", (err, row) => {
         if (!row) {
-            bcrypt.hash('sua-senha-aqui', SALT_ROUNDS, (err, hash) => {
+            bcrypt.hash('123456', SALT_ROUNDS, (err, hash) => {
                 if (err) throw err;
                 db.run(`INSERT INTO users (username, password) VALUES (?, ?)`, ['admin', hash], (err) => {
                     if (err) {
@@ -183,8 +183,8 @@ app.delete('/api/accounts/:id', authenticate, (req, res) => {
 app.post('/api/transactions', authenticate, (req, res) => {
     const { description, amount, type, account_id, due_date } = req.body;
     const userId = req.userId;
-    if (!account_id || !due_date) {
-        return res.status(400).json({ message: 'O ID da conta e a data de vencimento são obrigatórios.' });
+    if (!account_id) {
+        return res.status(400).json({ message: 'O ID da conta é obrigatório.' });
     }
     db.run(`INSERT INTO transactions (user_id, account_id, description, amount, type, due_date) VALUES (?, ?, ?, ?, ?, ?)`,
         [userId, account_id, description, amount, type, due_date],
