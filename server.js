@@ -26,9 +26,30 @@ db.serialize(() => {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE,
             password TEXT,
-            group_id INTEGER
+            group_id INTEGER,
+            role TEXT DEFAULT 'user'
         )
     `);
+
+    // Adiciona as novas colunas à tabela users se elas não existirem
+    const userColumns = ['whatsapp', 'instagram', 'email', 'consent_lgpd', 'role'];
+    userColumns.forEach(col => {
+        db.all(`PRAGMA table_info(users)`, (err, tableInfo) => {
+            if (!tableInfo || !Array.isArray(tableInfo) || !tableInfo.some(c => c.name === col)) {
+                let columnType = 'TEXT';
+                if (col === 'consent_lgpd') {
+                    columnType = 'INTEGER DEFAULT 0';
+                } else if (col === 'role') {
+                    columnType = 'TEXT DEFAULT \'user\'';
+                }
+                db.run(`ALTER TABLE users ADD COLUMN ${col} ${columnType}`, (err) => {
+                    if (err) {
+                        console.error(`Erro ao adicionar a coluna ${col} em users:`, err.message);
+                    }
+                });
+            }
+        });
+    });
 
     db.run(`
         CREATE TABLE IF NOT EXISTS accounts (
@@ -99,7 +120,7 @@ db.serialize(() => {
             bcrypt.hash('123456', SALT_ROUNDS, (err, hash) => {
                 if (err) throw err;
                 const groupId = 1; // Cria o primeiro grupo para o admin
-                db.run(`INSERT INTO users (username, password, group_id) VALUES (?, ?, ?)`, ['admin', hash, groupId], (err) => {
+                db.run(`INSERT INTO users (username, password, group_id, role) VALUES (?, ?, ?, ?)`, ['admin', hash, groupId, 'admin'], (err) => {
                     if (err) {
                         console.error('Erro ao inserir usuário padrão:', err.message);
                     } else {
@@ -125,11 +146,85 @@ const authenticate = (req, res, next) => {
     }
     req.userId = userId;
     req.groupId = groupId;
-    console.log('Autenticação bem-sucedida.');
-    next();
+
+    db.get(`SELECT role FROM users WHERE id = ?`, [userId], (err, user) => {
+        if (err || !user) {
+            console.log('Autenticação falhou: usuário não encontrado ou erro no DB ao buscar role.');
+            return res.status(401).json({ message: 'Não autorizado' });
+        }
+        req.userRole = user.role;
+        console.log('Autenticação bem-sucedida. Role:', req.userRole);
+        next();
+    });
+};
+
+const authorizeRole = (requiredRole) => (req, res, next) => {
+    if (req.userRole === requiredRole) {
+        next();
+    } else {
+        return res.status(403).json({ message: `Acesso negado. Apenas usuários com o papel '${requiredRole}' podem realizar esta ação.` });
+    }
 };
 
 // --- ROTAS DA API ---
+
+app.post('/api/register', (req, res) => {
+    const { username, password, whatsapp, instagram, email, consent_lgpd } = req.body;
+
+    if (!username || !password || !email || !consent_lgpd) {
+        return res.status(400).json({ message: 'Por favor, preencha todos os campos obrigatórios e aceite os termos da LGPD.' });
+    }
+
+    // Validação de senha no backend (repetindo a lógica do frontend por segurança)
+    const minLength = 6;
+    const hasUpperCase = /[A-Z]/.test(password);
+    const hasLowerCase = /[a-z]/.test(password);
+    const hasNumber = /[0-9]/.test(password);
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+
+    if (!(password.length >= minLength && hasUpperCase && hasLowerCase && hasNumber && hasSpecialChar)) {
+        return res.status(400).json({ message: 'A senha deve ter no mínimo 6 caracteres, com letras maiúsculas, minúsculas, números e caracteres especiais.' });
+    }
+
+    db.get("SELECT * FROM users WHERE username = ? OR email = ?", [username, email], (err, row) => {
+        if (err) {
+            return res.status(500).json({ message: 'Erro no banco de dados', error: err.message });
+        }
+        if (row) {
+            return res.status(400).json({ message: 'Usuário ou e-mail já cadastrado.' });
+        }
+
+        bcrypt.hash(password, SALT_ROUNDS, (err, hash) => {
+            if (err) {
+                return res.status(500).json({ message: 'Erro ao criptografar senha', error: err.message });
+            }
+
+            // Encontra o maior group_id existente e adiciona 1, ou usa 1 se não houver nenhum
+            db.get("SELECT MAX(group_id) as max_group_id FROM users", (err, result) => {
+                // Cada novo registro terá seu próprio grupo (group_id = id do usuário)
+                // O group_id final será definido após a inserção para ser igual ao userId
+                const initialGroupId = 0; // Valor temporário
+                db.run(
+                    `INSERT INTO users (username, password, group_id, whatsapp, instagram, email, consent_lgpd, role) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [username, hash, initialGroupId, whatsapp, instagram, email, consent_lgpd ? 1 : 0, 'user'],
+                    function (err) {
+                        if (err) {
+                            return res.status(500).json({ message: 'Erro ao registrar usuário', error: err.message });
+                        }
+                        const newUserId = this.lastID;
+                        // Atualiza o group_id para ser igual ao userId
+                        db.run(`UPDATE users SET group_id = ? WHERE id = ?`, [newUserId, newUserId], (updateErr) => {
+                            if (updateErr) {
+                                console.error('Erro ao atualizar group_id do novo usuário:', updateErr.message);
+                            }
+                            res.status(201).json({ message: 'Usuário registrado com sucesso!', userId: newUserId, groupId: newUserId, role: 'user' });
+                        });
+                    }
+                );
+            });
+        });
+    });
+});
 
 app.post('/api/login', (req, res) => {
     const { username, password } = req.body;
@@ -139,7 +234,7 @@ app.post('/api/login', (req, res) => {
         }
         const match = await bcrypt.compare(password, user.password);
         if (match) {
-            return res.json({ message: 'Login bem-sucedido', userId: user.id, groupId: user.group_id });
+            return res.json({ message: 'Login bem-sucedido', userId: user.id, groupId: user.group_id, userRole: user.role });
         } else {
             return res.status(400).json({ message: 'Usuário ou senha inválidos' });
         }
@@ -147,14 +242,14 @@ app.post('/api/login', (req, res) => {
 });
 
 app.post('/api/users/add', authenticate, (req, res) => {
-    const { username, password } = req.body;
+    const { username, password, whatsapp, instagram, email } = req.body;
     const groupId = req.groupId;
 
     bcrypt.hash(password, SALT_ROUNDS, (err, hash) => {
         if (err) {
             return res.status(500).json({ message: 'Erro ao criar usuário', error: err.message });
         }
-        db.run(`INSERT INTO users (username, password, group_id) VALUES (?, ?, ?)`, [username, hash, groupId], (err) => {
+        db.run(`INSERT INTO users (username, password, group_id, role, whatsapp, instagram, email) VALUES (?, ?, ?, ?, ?, ?, ?)`, [username, hash, groupId, 'collaborator', whatsapp, instagram, email], (err) => {
             if (err) {
                 return res.status(400).json({ message: 'Usuário já existe ou erro no banco.', error: err.message });
             }
@@ -165,12 +260,74 @@ app.post('/api/users/add', authenticate, (req, res) => {
 
 app.get('/api/users/list', authenticate, (req, res) => {
     const groupId = req.groupId;
-    db.all(`SELECT id, username FROM users WHERE group_id = ?`, [groupId], (err, rows) => {
+    const userRole = req.userRole;
+
+    let query = '';
+    let params = [];
+
+    if (userRole === 'admin') {
+        query = `SELECT id, username, email, whatsapp, instagram, consent_lgpd, role, group_id FROM users`;
+    } else if (userRole === 'user') {
+        // Usuários normais veem apenas seus colaboradores
+        query = `SELECT id, username, email, whatsapp, instagram, consent_lgpd, role, group_id FROM users WHERE group_id = ? AND role = 'collaborator'`;
+        params = [groupId];
+    } else {
+        return res.status(403).json({ message: 'Acesso negado para este tipo de usuário.' });
+    }
+
+    db.all(query, params, (err, rows) => {
         if (err) {
             return res.status(500).json({ message: 'Erro ao buscar usuários', error: err.message });
         }
         res.json(rows);
     });
+});
+
+// Novo endpoint para buscar dados de um único usuário
+app.get('/api/users/:id', authenticate, (req, res) => {
+    const { id } = req.params;
+    const userIdToFetch = parseInt(id);
+    const loggedInUserId = parseInt(req.userId);
+    const userRole = req.userRole;
+    const loggedInGroupId = parseInt(req.groupId);
+
+    // Administradores podem buscar qualquer usuário.
+    // Usuários normais podem buscar apenas a si mesmos OU colaboradores do seu grupo.
+    if (userRole === 'admin' || loggedInUserId === userIdToFetch) {
+        db.get(`SELECT id, username, email, whatsapp, instagram, consent_lgpd, role, group_id FROM users WHERE id = ?`, [userIdToFetch], (err, row) => {
+            if (err) {
+                console.error('Erro ao buscar usuário:', err.message);
+                return res.status(500).json({ message: 'Erro ao buscar dados do usuário', error: err.message });
+            }
+            if (!row) {
+                return res.status(404).json({ message: 'Usuário não encontrado.' });
+            }
+            res.json(row);
+        });
+    } else if (userRole === 'user') {
+        // Se for um usuário normal, verifica se está tentando acessar um colaborador do mesmo grupo
+        db.get(`SELECT group_id, role FROM users WHERE id = ?`, [userIdToFetch], (err, userToFetch) => {
+            if (err || !userToFetch) {
+                return res.status(404).json({ message: 'Usuário não encontrado.' });
+            }
+            if (userToFetch.group_id === loggedInGroupId && userToFetch.role === 'collaborator') {
+                db.get(`SELECT id, username, email, whatsapp, instagram, consent_lgpd, role, group_id FROM users WHERE id = ?`, [userIdToFetch], (err, row) => {
+                    if (err) {
+                        console.error('Erro ao buscar usuário colaborador:', err.message);
+                        return res.status(500).json({ message: 'Erro ao buscar dados do usuário colaborador', error: err.message });
+                    }
+                    res.json(row);
+                });
+            } else {
+                console.log(`Acesso negado para User ID ${loggedInUserId} (role: ${userRole}, group: ${loggedInGroupId}) tentando acessar User ID ${userIdToFetch} (role: ${userToFetch.role}, group: ${userToFetch.group_id}). Razão: Mismatch de grupo ou papel não é colaborador.`);
+                return res.status(403).json({ message: 'Acesso negado. Você não tem permissão para ver este usuário.' });
+            }
+        });
+    }
+     else {
+        console.log(`Acesso negado para User ID ${loggedInUserId} (role: ${userRole}, group: ${loggedInGroupId}) tentando acessar User ID ${userIdToFetch}. Razão: Papel de usuário não permitido.`);
+        return res.status(403).json({ message: 'Acesso negado. Você não tem permissão para ver este usuário.' });
+    }
 });
 
 app.post('/api/accounts', authenticate, (req, res) => {
@@ -195,7 +352,27 @@ app.get('/api/accounts', authenticate, (req, res) => {
             console.error('Erro no banco de dados:', err.message);
             return res.status(500).json({ message: 'Erro ao buscar contas', error: err.message });
         }
-        res.json(rows);
+
+        // Se nenhuma conta for encontrada, cria uma conta padrão para o grupo
+        if (rows.length === 0) {
+            console.log(`Nenhuma conta encontrada para o Group ID ${groupId}. Criando conta padrão.`);
+            db.run(`INSERT INTO accounts (group_id, name) VALUES (?, ?)`, [groupId, 'Conta Principal'], function(insertErr) {
+                if (insertErr) {
+                    console.error('Erro ao criar conta padrão:', insertErr.message);
+                    return res.status(500).json({ message: 'Erro ao criar conta padrão', error: insertErr.message });
+                }
+                // Após criar, busca novamente para retornar a conta padrão
+                db.all(`SELECT * FROM accounts WHERE group_id = ?`, [groupId], (finalErr, finalRows) => {
+                    if (finalErr) {
+                        console.error('Erro ao buscar contas após criação de padrão:', finalErr.message);
+                        return res.status(500).json({ message: 'Erro ao buscar contas', error: finalErr.message });
+                    }
+                    res.json(finalRows);
+                });
+            });
+        } else {
+            res.json(rows);
+        }
     });
 });
 
@@ -361,6 +538,188 @@ app.delete('/api/transactions/:id', authenticate, (req, res) => {
             return res.status(404).json({ message: 'Transação não encontrada ou sem permissão' });
         }
         res.status(200).json({ message: 'Transação deletada com sucesso' });
+    });
+});
+
+// Nova rota DELETE para /api/users/:id para lidar com deleção por admin ou user
+app.delete('/api/users/:id', authenticate, async (req, res) => {
+    const { id } = req.params;
+    const userIdToDelete = parseInt(id);
+    const loggedInUserId = parseInt(req.userId);
+    const userRole = req.userRole;
+    const loggedInGroupId = parseInt(req.groupId);
+
+    // Impede que o próprio usuário logado tente se deletar
+    if (userIdToDelete === loggedInUserId) {
+        return res.status(400).json({ message: 'Não é possível deletar o próprio usuário.' });
+    }
+
+    if (userRole === 'admin') {
+        // Admin pode deletar qualquer usuário (exceto a si mesmo, já verificado acima)
+        db.run(`DELETE FROM users WHERE id = ?`, [userIdToDelete], function (err) {
+            if (err) {
+                console.error('Erro ao deletar usuário por admin:', err.message);
+                return res.status(500).json({ message: 'Erro ao deletar usuário', error: err.message });
+            }
+            if (this.changes === 0) {
+                return res.status(404).json({ message: 'Usuário não encontrado ou sem permissão para deletar' });
+            }
+            res.status(200).json({ message: 'Usuário deletado com sucesso pelo admin!' });
+        });
+    } else if (userRole === 'user') {
+        // Usuário normal pode deletar colaboradores do seu próprio grupo
+        db.get(`SELECT group_id, role FROM users WHERE id = ?`, [userIdToDelete], (err, userToDelete) => {
+            if (err || !userToDelete) {
+                return res.status(404).json({ message: 'Usuário a ser deletado não encontrado.' });
+            }
+
+            // Verifica se o usuário a ser deletado é um colaborador do mesmo grupo
+            if (userToDelete.group_id === loggedInGroupId && userToDelete.role === 'collaborator') {
+                db.run(`DELETE FROM users WHERE id = ?`, [userIdToDelete], function (err) {
+                    if (err) {
+                        console.error('Erro ao deletar colaborador:', err.message);
+                        return res.status(500).json({ message: 'Erro ao deletar colaborador', error: err.message });
+                    }
+                    if (this.changes === 0) {
+                        return res.status(404).json({ message: 'Colaborador não encontrado ou sem permissão para deletar' });
+                    }
+                    res.status(200).json({ message: 'Colaborador deletado com sucesso pelo usuário!' });
+                });
+            } else {
+                return res.status(403).json({ message: 'Acesso negado. Você não tem permissão para deletar este usuário (não é um colaborador do seu grupo, ou possui papel diferente).' });
+            }
+        });
+    } else {
+        return res.status(403).json({ message: 'Acesso negado. Seu papel não permite deletar usuários.' });
+    }
+});
+
+app.put('/api/users/:id', authenticate, async (req, res) => {
+    const { id } = req.params;
+    const userIdToEdit = parseInt(id);
+    const { username, whatsapp, instagram, email, consent_lgpd, role, group_id } = req.body;
+
+    // 1. Autorização inicial
+    if (req.userRole !== 'admin' && req.userId !== userIdToEdit) {
+        // Se não for admin e não for o próprio usuário, verifica se é um colaborador do grupo
+        if (req.userRole === 'user') {
+            const userToEdit = await new Promise((resolve, reject) => {
+                db.get(`SELECT group_id, role FROM users WHERE id = ?`, [userIdToEdit], (err, row) => {
+                    if (err) reject(err); else resolve(row);
+                });
+            });
+
+            if (!userToEdit || userToEdit.group_id !== parseInt(req.groupId) || userToEdit.role !== 'collaborator') {
+                return res.status(403).json({ message: 'Acesso negado. Você só pode editar seus próprios dados ou os de colaboradores do seu grupo.' });
+            }
+        } else {
+            return res.status(403).json({ message: 'Acesso negado. Você não tem permissão para editar este usuário.' });
+        }
+    }
+
+    // 2. Validações adicionais (imutabilidade de role/group_id para não-admin e admin-principal)
+    if (req.userRole !== 'admin') {
+        // Usuários normais não podem alterar seu papel ou grupo
+        if (role !== undefined || group_id !== undefined) {
+            return res.status(403).json({ message: 'Acesso negado. Usuários não podem alterar seu papel ou grupo.' });
+        }
+    } else {
+        // Admin pode alterar role e group_id, mas o admin principal (ID 1) não pode ter seu papel alterado
+        if (userIdToEdit === 1 && (role !== undefined && role !== 'admin')) {
+            return res.status(403).json({ message: 'Acesso negado. O papel do usuário admin (ID 1) não pode ser alterado.' });
+        }
+    }
+
+    let updateFields = [];
+    let updateParams = [];
+
+    if (username !== undefined) { updateFields.push(`username = ?`); updateParams.push(username); }
+    if (whatsapp !== undefined) { updateFields.push(`whatsapp = ?`); updateParams.push(whatsapp); }
+    if (instagram !== undefined) { updateFields.push(`instagram = ?`); updateParams.push(instagram); }
+    if (email !== undefined) { updateFields.push(`email = ?`); updateParams.push(email); }
+    if (consent_lgpd !== undefined) { updateFields.push(`consent_lgpd = ?`); updateParams.push(consent_lgpd ? 1 : 0); }
+
+    // Apenas admin pode alterar o role e group_id
+    if (req.userRole === 'admin') {
+        if (role !== undefined) { updateFields.push(`role = ?`); updateParams.push(role); }
+        if (group_id !== undefined) { updateFields.push(`group_id = ?`); updateParams.push(group_id); }
+    }
+
+    if (updateFields.length === 0) {
+        return res.status(400).json({ message: 'Nenhum campo para atualizar.' });
+    }
+
+    const query = `UPDATE users SET ${updateFields.join(', ')} WHERE id = ?`;
+    updateParams.push(userIdToEdit);
+
+    db.run(query, updateParams, function (err) {
+        if (err) {
+            console.error('Erro ao atualizar usuário:', err.message);
+            return res.status(500).json({ message: 'Erro ao atualizar usuário.', error: err.message });
+        }
+        if (this.changes === 0) {
+            return res.status(404).json({ message: 'Usuário não encontrado ou sem permissão para atualizar.' });
+        }
+        res.status(200).json({ message: 'Usuário atualizado com sucesso!' });
+    });
+});
+
+app.put('/api/users/:id/change-password', authenticate, async (req, res) => {
+    const { id } = req.params;
+    const userIdToChange = parseInt(id);
+    const { current_password, new_password } = req.body;
+
+    // 1. Autorização: Usuário só pode alterar a própria senha
+    if (parseInt(req.userId) !== userIdToChange) {
+        return res.status(403).json({ message: 'Acesso negado. Você só pode alterar a sua própria senha.' });
+    }
+
+    // 2. Buscar senha atual do usuário
+    db.get(`SELECT password FROM users WHERE id = ?`, [userIdToChange], async (err, user) => {
+        if (err) {
+            console.error('Erro ao buscar usuário para alteração de senha:', err.message);
+            return res.status(500).json({ message: 'Erro no banco de dados.' });
+        }
+        if (!user) {
+            return res.status(404).json({ message: 'Usuário não encontrado.' });
+        }
+
+        // 3. Comparar senha atual fornecida com a senha armazenada
+        const match = await bcrypt.compare(current_password, user.password);
+        if (!match) {
+            return res.status(400).json({ message: 'Senha atual incorreta.' });
+        }
+
+        // 4. Validar nova senha (reutilizando lógica do registro)
+        const minLength = 6;
+        const hasUpperCase = /[A-Z]/.test(new_password);
+        const hasLowerCase = /[a-z]/.test(new_password);
+        const hasNumber = /[0-9]/.test(new_password);
+        const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(new_password);
+
+        if (!(new_password.length >= minLength && hasUpperCase && hasLowerCase && hasNumber && hasSpecialChar)) {
+            return res.status(400).json({ message: 'A nova senha deve ter no mínimo 6 caracteres, com letras maiúsculas, minúsculas, números e caracteres especiais.' });
+        }
+
+        // 5. Criptografar nova senha
+        bcrypt.hash(new_password, SALT_ROUNDS, (hashErr, newHashedPassword) => {
+            if (hashErr) {
+                console.error('Erro ao criptografar nova senha:', hashErr.message);
+                return res.status(500).json({ message: 'Erro ao criptografar nova senha.' });
+            }
+
+            // 6. Atualizar senha no banco de dados
+            db.run(`UPDATE users SET password = ? WHERE id = ?`, [newHashedPassword, userIdToChange], function (updateErr) {
+                if (updateErr) {
+                    console.error('Erro ao atualizar senha no banco de dados:', updateErr.message);
+                    return res.status(500).json({ message: 'Erro ao atualizar senha.' });
+                }
+                if (this.changes === 0) {
+                    return res.status(404).json({ message: 'Usuário não encontrado para atualizar a senha.' });
+                }
+                res.status(200).json({ message: 'Senha alterada com sucesso!' });
+            });
+        });
     });
 });
 

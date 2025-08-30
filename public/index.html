@@ -11,6 +11,7 @@
 </head>
 <body>
 
+    <!-- Tela de Login -->
     <div id="login-screen" class="container d-flex justify-content-center align-items-center vh-100">
         <div class="card p-4 shadow-sm w-100" style="max-width: 400px;">
             <h1 class="card-title text-center text-primary">Acesso Protegido</h1>
@@ -25,100 +26,396 @@
                 </div>
                 <button type="submit" class="btn btn-primary w-100">Entrar</button>
                 <p id="error-message" class="text-danger text-center mt-3 hidden">Usuário ou senha incorretos. Tente novamente.</p>
+                <p class="text-center mt-3 mb-0">
+                    Não tem uma conta? <a href="#register" data-page="register" id="show-register-link">Crie uma aqui</a>
+                </p>
             </form>
         </div>
     </div>
 
-    <div id="main-app" class="container mt-5 hidden">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h1 class="text-primary">Meu Controle Financeiro</h1>
-            <button id="logout-button" class="btn btn-danger">Sair</button>
+    <!-- Tela de Cadastro -->
+    <div id="register-screen" class="container d-flex justify-content-center align-items-center vh-100 hidden">
+        <div class="card p-4 shadow-sm w-100" style="max-width: 400px;">
+            <h1 class="card-title text-center text-primary">Criar Nova Conta</h1>
+            <form id="register-form">
+                <div class="mb-3">
+                    <label for="register-username" class="form-label">Nome de Usuário:</label>
+                    <input type="text" class="form-control" id="register-username" required>
+                </div>
+                <div class="mb-3">
+                    <label for="register-password" class="form-label">Senha:</label>
+                    <input type="password" class="form-control" id="register-password" minlength="6" required>
+                    <small class="form-text text-muted">Mínimo 6 caracteres, com maiúscula, minúscula, número e caractere especial.</small>
+                    <div id="password-strength" class="mt-1"></div>
+                </div>
+                <div class="mb-3">
+                    <label for="register-confirm-password" class="form-label">Confirmar Senha:</label>
+                    <input type="password" class="form-control" id="register-confirm-password" minlength="6" required>
+                </div>
+                <div class="mb-3">
+                    <label for="register-whatsapp" class="form-label">WhatsApp:</label>
+                    <input type="text" class="form-control" id="register-whatsapp" placeholder="(XX) XXXXX-XXXX">
+                </div>
+                <div class="mb-3">
+                    <label for="register-instagram" class="form-label">Instagram:</label>
+                    <input type="text" class="form-control" id="register-instagram" placeholder="@seuinstagram">
+                </div>
+                <div class="mb-3">
+                    <label for="register-email" class="form-label">Email:</label>
+                    <input type="email" class="form-control" id="register-email" required>
+                </div>
+                <div class="form-check mb-3">
+                    <input type="checkbox" class="form-check-input" id="consent-lgpd" required>
+                    <label class="form-check-label" for="consent-lgpd">
+                        Concordo com o <a href="#" data-bs-toggle="modal" data-bs-target="#lgpdModal">Termo de Consentimento</a> e aceito ser contatado via redes sociais para fins de marketing.
+                    </label>
+                    <div class="invalid-feedback">Você deve concordar para prosseguir.</div>
+                </div>
+                <button type="submit" class="btn btn-success w-100">Cadastrar</button>
+                <p id="register-error-message" class="text-danger text-center mt-3 hidden"></p>
+                <p class="text-center mt-3 mb-0">
+                    Já tem uma conta? <a href="#login" data-page="login" id="show-login-link">Faça login aqui</a>
+                </p>
+            </form>
         </div>
-        
-        <div class="row">
-            <div class="col-md-6 mb-4">
-                <div class="card p-3 shadow-sm">
-                    <h2 class="text-primary">Resumo Consolidado</h2>
-                    <p class="mb-1">Receita Total: <span id="total-income" class="fw-bold text-success">R$ 0,00</span></p>
-                    <p class="mb-1">Despesa Total: <span id="total-expense" class="fw-bold text-danger">R$ 0,00</span></p>
-                    <p class="mb-1">Saldo Total: <span id="balance" class="fw-bold">R$ 0,00</span></p>
-                </div>
-                <div class="card p-3 shadow-sm mt-3">
-                    <h2 class="text-primary">Saldos por Conta (Líquido)</h2>
-                    <ul id="accounts-summary-list" class="list-group list-group-flush"></ul>
-                </div>
+    </div>
 
-                <div class="card p-3 shadow-sm mt-3">
-                    <h2 class="text-primary">Usuários do Grupo</h2>
-                    <ul id="group-users-list" class="list-group list-group-flush"></ul>
-                    <form id="add-user-form" class="mt-3">
-                        <div class="mb-3">
-                            <label for="new-username" class="form-label">Nome do novo usuário:</label>
-                            <input type="text" class="form-control" id="new-username" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="new-password" class="form-label">Senha:</label>
-                            <input type="password" class="form-control" id="new-password" required>
-                        </div>
-                        <button type="submit" class="btn btn-secondary w-100">Adicionar ao Grupo</button>
-                    </form>
+    <!-- Modal LGPD -->
+    <div class="modal fade" id="lgpdModal" tabindex="-1" aria-labelledby="lgpdModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="lgpdModalLabel">Termo de Consentimento LGPD</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Ao realizar o cadastro, você concorda que seus dados (Nome de Usuário, Email, WhatsApp e Instagram) sejam armazenados para fins de acesso ao sistema e contato para marketing. Garantimos o sigilo e a segurança das suas informações conforme a Lei Geral de Proteção de Dados (LGPD) - Lei nº 13.709/2018. Você pode solicitar a remoção ou correção dos seus dados a qualquer momento.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Entendi</button>
                 </div>
             </div>
+        </div>
+    </div>
 
-            <div class="col-md-6 mb-4">
-                <div class="card p-3 shadow-sm">
-                    <form id="account-form">
-                        <h2 class="text-primary">Adicionar Conta</h2>
-                        <div class="mb-3">
-                            <label for="account-name" class="form-label">Nome da Conta:</label>
-                            <input type="text" class="form-control" id="account-name" required>
-                        </div>
-                        <button type="submit" class="btn btn-primary w-100">Adicionar Conta</button>
-                    </form>
+    <!-- Aplicação Principal -->
+    <div id="main-app" class="d-flex hidden">
+        <!-- Botão de toggle para mobile -->
+        <button id="sidebar-toggle-mobile" class="sidebar-toggle-mobile">
+            <i class="fas fa-bars"></i>
+        </button>
+        
+        <!-- Menu Lateral -->
+        <nav id="sidebar" class="sidebar">
+            <div class="sidebar-header d-flex justify-content-between align-items-center p-3">
+                <h5 class="text-white mb-0">Finanças</h5>
+                <button id="sidebar-toggle" class="btn btn-link text-white p-0">
+                    <i class="fas fa-bars"></i>
+                </button>
+            </div>
+            
+            <ul class="nav flex-column">
+                <li class="nav-item">
+                    <a class="nav-link active" href="#dashboard" data-page="dashboard">
+                        <i class="fas fa-tachometer-alt me-2"></i>
+                        <span class="nav-text">Dashboard</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#contas" data-page="contas">
+                        <i class="fas fa-university me-2"></i>
+                        <span class="nav-text">Contas Bancárias</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#transacoes" data-page="transacoes">
+                        <i class="fas fa-exchange-alt me-2"></i>
+                        <span class="nav-text">Transações</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#transferencia" data-page="transferencia">
+                        <i class="fas fa-share-square me-2"></i>
+                        <span class="nav-text">Transferência</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#usuarios" data-page="usuarios">
+                        <i class="fas fa-users me-2"></i>
+                        <span class="nav-text">Usuários</span>
+                    </a>
+                </li>
+                <li class="nav-item hidden" id="admin-users-link-item">
+                    <a class="nav-link" href="#admin-users" data-page="admin-users">
+                        <i class="fas fa-user-shield me-2"></i>
+                        <span class="nav-text">Gerenciar Usuários</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#change-password" data-bs-toggle="modal" data-bs-target="#changePasswordModal">
+                        <i class="fas fa-key me-2"></i>
+                        <span class="nav-text">Alterar Senha</span>
+                    </a>
+                </li>
+            </ul>
+            
+            <div class="sidebar-footer mt-auto p-3">
+                <button id="logout-button" class="btn btn-danger w-100">
+                    <i class="fas fa-sign-out-alt me-2"></i>
+                    <span class="nav-text">Sair</span>
+                </button>
+            </div>
+        </nav>
+
+        <!-- Conteúdo Principal -->
+        <div id="main-content" class="main-content">
+            <!-- Header -->
+            <header class="bg-white shadow-sm p-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h4 id="page-title" class="mb-0">Dashboard</h4>
+                    <div class="d-flex align-items-center">
+                        <span class="me-3">Bem-vindo, <strong id="current-user">Admin</strong></span>
+                    </div>
                 </div>
+            </header>
 
-                <div class="card p-3 shadow-sm mt-3">
-                    <form id="transaction-form">
-                        <h2 id="form-title" class="text-primary">Adicionar Transação</h2>
-                        <input type="hidden" id="transaction-id">
-                        <div class="mb-3">
-                            <label for="account-select" class="form-label">Conta:</label>
-                            <select class="form-select" id="account-select" required></select>
-                        </div>
-                        <div class="mb-3">
-                            <label for="description" class="form-label">Descrição:</label>
-                            <input type="text" class="form-control" id="description" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="amount" class="form-label">Valor:</label>
-                            <input type="number" class="form-control" id="amount" step="0.01" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="type" class="form-label">Tipo:</label>
-                            <select class="form-select" id="type" required>
-                                <option value="income">Receita</option>
-                                <option value="expense">Despesa</option>
-                            </select>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label for="transaction-date" class="form-label">Data da Transação:</label>
-                            <div class="input-group">
-                                <span class="input-group-text calendar-icon-btn"><i class="fas fa-calendar-alt"></i></span>
-                                <input type="date" class="form-control d-none" id="transaction-date" required>
-                                <input type="text" class="form-control" id="transaction-date-display" readonly>
+            <!-- Container das Páginas -->
+            <div class="container-fluid p-4">
+                <!-- Dashboard -->
+                <div id="dashboard-page" class="page-content">
+                    <div class="row">
+                        <div class="col-md-6 mb-4">
+                            <div class="card p-3 shadow-sm">
+                                <h2 class="text-primary">Resumo Consolidado</h2>
+                                <p class="mb-1">Receita Total: <span id="total-income" class="fw-bold text-success">R$ 0,00</span></p>
+                                <p class="mb-1">Despesa Total: <span id="total-expense" class="fw-bold text-danger">R$ 0,00</span></p>
+                                <p class="mb-1">Saldo Total: <span id="balance" class="fw-bold">R$ 0,00</span></p>
                             </div>
                         </div>
+                        <div class="col-md-6 mb-4">
+                            <div class="card p-3 shadow-sm">
+                                <h2 class="text-primary">Resumo por Conta</h2>
+                                <div id="accounts-detailed-summary"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-12 mb-4">
+                            <div class="card p-3 shadow-sm">
+                                <h2 class="text-primary">Resumo Detalhado por Conta</h2>
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Conta</th>
+                                                <th class="text-center">Total Entradas</th>
+                                                <th class="text-center">Total Saídas</th>
+                                                <th class="text-center">Saldo</th>
+                                                <th class="text-center">Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="accounts-detailed-table">
+                                            <!-- Dados serão inseridos via JavaScript -->
+                                        </tbody>
+                                        <tfoot class="table-light">
+                                            <tr class="fw-bold">
+                                                <td>TOTAL GERAL</td>
+                                                <td class="text-center text-success" id="grand-total-income">R$ 0,00</td>
+                                                <td class="text-center text-danger" id="grand-total-expense">R$ 0,00</td>
+                                                <td class="text-center" id="grand-total-balance">R$ 0,00</td>
+                                                <td class="text-center">
+                                                    <span id="grand-total-status" class="badge bg-secondary">-</span>
+                                                </td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-                        <button type="submit" id="submit-button" class="btn btn-primary w-100">Adicionar</button>
-                    </form>
+                <!-- Contas Bancárias -->
+                <div id="contas-page" class="page-content hidden">
+                    <div class="row">
+                        <div class="col-md-6 mb-4">
+                            <div class="card p-3 shadow-sm">
+                                <form id="account-form">
+                                    <h2 class="text-primary">Adicionar Conta</h2>
+                                    <div class="mb-3">
+                                        <label for="account-name" class="form-label">Nome da Conta:</label>
+                                        <input type="text" class="form-control" id="account-name" required>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary w-100">Adicionar Conta</button>
+                                </form>
+                            </div>
+                            
+                        </div>
+                        <div class="col-md-6 mb-4">
+                            <div class="card p-3 shadow-sm">
+                                <h2 class="text-primary">Lista de Contas</h2>
+                                <ul id="accounts-list" class="list-group list-group-flush"></ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Transações -->
+                <div id="transacoes-page" class="page-content hidden">
+                    <div class="row">
+                        <div class="col-md-6 mb-4">
+                            <div class="card p-3 shadow-sm">
+                                <form id="transaction-form">
+                                    <h2 id="form-title" class="text-primary">Adicionar Transação</h2>
+                                    <input type="hidden" id="transaction-id">
+                                    <div class="mb-3">
+                                        <label for="account-select" class="form-label">Conta:</label>
+                                        <select class="form-select" id="account-select" required></select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="description" class="form-label">Descrição:</label>
+                                        <input type="text" class="form-control" id="description" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="amount" class="form-label">Valor:</label>
+                                        <input type="number" class="form-control" id="amount" step="0.01" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="type" class="form-label">Tipo:</label>
+                                        <select class="form-select" id="type" required>
+                                            <option value="income">Receita</option>
+                                            <option value="expense">Despesa</option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="transaction-date" class="form-label">Data da Transação:</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text calendar-icon-btn"><i class="fas fa-calendar-alt"></i></span>
+                                            <input type="date" class="form-control d-none" id="transaction-date" required>
+                                            <input type="text" class="form-control" id="transaction-date-display" readonly>
+                                        </div>
+                                    </div>
+                                    <button type="submit" id="submit-button" class="btn btn-primary w-100">Adicionar</button>
+                                </form>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-4">
+                            <div class="card p-3 shadow-sm">
+                                <h2 class="text-primary">Histórico de Transações</h2>
+                                <ul id="transaction-list" class="list-group list-group-flush"></ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Usuários -->
+                <div id="usuarios-page" class="page-content hidden">
+                    <div class="row">
+                        <div class="col-md-6 mb-4">
+                            <div class="card p-3 shadow-sm">
+                                <h2 class="text-primary">Usuários do Grupo</h2>
+                                <ul id="group-users-list" class="list-group list-group-flush"></ul>
+                                <form id="add-user-form" class="mt-3 hidden">
+                                    <div class="mb-3">
+                                        <label for="new-username" class="form-label">Nome do novo usuário:</label>
+                                        <input type="text" class="form-control" id="new-username" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="new-password" class="form-label">Senha:</label>
+                                        <input type="password" class="form-control" id="new-password" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="new-whatsapp" class="form-label">WhatsApp:</label>
+                                        <input type="text" class="form-control" id="new-whatsapp" placeholder="(XX) XXXXX-XXXX">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="new-instagram" class="form-label">Instagram:</label>
+                                        <input type="text" class="form-control" id="new-instagram" placeholder="@seuinstagram">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="new-email" class="form-label">Email:</label>
+                                        <input type="email" class="form-control" id="new-email">
+                                    </div>
+                                    <button type="submit" class="btn btn-secondary w-100">Adicionar ao Grupo</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Transferência -->
+                <div id="transferencia-page" class="page-content hidden">
+                    <div class="row">
+                        <div class="col-md-8 offset-md-2 mb-4">
+                            <div class="card p-3 shadow-sm">
+                                <form id="transfer-form">
+                                    <h2 class="text-primary">Transferir Saldo</h2>
+                                    <div class="mb-3">
+                                        <label for="from-account" class="form-label">Conta de Origem:</label>
+                                        <select class="form-select" id="from-account" required>
+                                            <option value="">Selecione a conta de origem</option>
+                                        </select>
+                                        <small class="text-muted">Saldo disponível: <span id="from-account-balance" class="fw-bold">R$ 0,00</span></small>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="to-account" class="form-label">Conta de Destino:</label>
+                                        <select class="form-select" id="to-account" required>
+                                            <option value="">Selecione a conta de destino</option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="transfer-amount" class="form-label">Valor a Transferir:</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text">R$</span>
+                                            <input type="number" class="form-control" id="transfer-amount" step="0.01" min="0.01" required>
+                                        </div>
+                                        <small class="text-muted">Máximo disponível: <span id="max-transfer-amount" class="fw-bold text-success">R$ 0,00</span></small>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="transfer-description" class="form-label">Descrição da Transferência:</label>
+                                        <input type="text" class="form-control" id="transfer-description" placeholder="Ex: Transferência entre contas" required>
+                                    </div>
+                                    <button type="submit" class="btn btn-success w-100" id="transfer-button" disabled>
+                                        <i class="fas fa-exchange-alt me-2"></i>Transferir Saldo
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Gerenciar Usuários (Admin) -->
+                <div id="admin-users-page" class="page-content hidden">
+                    <div class="row">
+                        <div class="col-12 mb-4">
+                            <div class="card p-3 shadow-sm">
+                                <h2 class="text-primary">Gerenciar Usuários do Sistema</h2>
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>ID</th>
+                                                <th>Usuário</th>
+                                                <th>Email</th>
+                                                <th>WhatsApp</th>
+                                                <th>Instagram</th>
+                                                <th>LGPD</th>
+                                                <th>Grupo</th>
+                                                <th>Papel</th>
+                                                <th>Ações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="admin-users-list">
+                                            <!-- Dados serão inseridos via JavaScript -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>
-        
-        <div class="card p-3 shadow-sm mt-3 mb-5">
-            <h2 class="text-primary">Histórico de Transações</h2>
-            <ul id="transaction-list" class="list-group list-group-flush"></ul>
         </div>
     </div>
 
@@ -126,3 +423,85 @@
     <script type="module" src="js/main.js"></script>
 </body>
 </html>
+
+<!-- Modal de Edição de Usuário -->
+<div class="modal fade" id="editUserModal" tabindex="-1" aria-labelledby="editUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editUserModalLabel">Editar Usuário</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="edit-user-form">
+                    <div class="mb-3">
+                        <label for="edit-username" class="form-label">Nome de Usuário:</label>
+                        <input type="text" class="form-control" id="edit-username" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-whatsapp" class="form-label">WhatsApp:</label>
+                        <input type="text" class="form-control" id="edit-whatsapp" placeholder="(XX) XXXXX-XXXX">
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-instagram" class="form-label">Instagram:</label>
+                        <input type="text" class="form-control" id="edit-instagram" placeholder="@seuinstagram">
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-email" class="form-label">Email:</label>
+                        <input type="email" class="form-control" id="edit-email" required>
+                    </div>
+                    <div class="mb-3" id="edit-role-group" style="display: none;">
+                        <label for="edit-role" class="form-label">Papel:</label>
+                        <select class="form-select" id="edit-role">
+                            <option value="user">user</option>
+                            <option value="collaborator">collaborator</option>
+                            <option value="admin">admin</option>
+                        </select>
+                    </div>
+                    <div class="mb-3" id="edit-group-id-group" style="display: none;">
+                        <label for="edit-group-id" class="form-label">ID do Grupo:</label>
+                        <input type="number" class="form-control" id="edit-group-id" min="1">
+                    </div>
+                    <div class="form-check mb-3">
+                        <input type="checkbox" class="form-check-input" id="edit-consent-lgpd">
+                        <label class="form-check-label" for="edit-consent-lgpd">Consentimento LGPD</label>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Salvar Alterações</button>
+                    <p id="edit-user-error-message" class="text-danger text-center mt-3 hidden"></p>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Alteração de Senha -->
+<div class="modal fade" id="changePasswordModal" tabindex="-1" aria-labelledby="changePasswordModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="changePasswordModalLabel">Alterar Senha</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="change-password-form">
+                    <div class="mb-3">
+                        <label for="current-password" class="form-label">Senha Atual:</label>
+                        <input type="password" class="form-control" id="current-password" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="new-password" class="form-label">Nova Senha:</label>
+                        <input type="password" class="form-control" id="change-new-password" required>
+                        <small class="form-text text-muted">Mínimo 6 caracteres, com maiúscula, minúscula, número e caractere especial.</small>
+                        <div id="new-password-strength" class="mt-1"></div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="confirm-new-password" class="form-label">Confirmar Nova Senha:</label>
+                        <input type="password" class="form-control" id="confirm-new-password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Salvar Nova Senha</button>
+                    <p id="change-password-error-message" class="text-danger text-center mt-3 hidden"></p>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
