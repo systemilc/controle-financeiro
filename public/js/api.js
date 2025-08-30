@@ -89,6 +89,30 @@ export const api = {
         return await response.json();
     },
 
+    // Métodos para Categorias
+    createCategory: async (name, type) => {
+        const response = await fetch('/api/categories', {
+            method: 'POST',
+            headers: headers(),
+            body: JSON.stringify({ name, type }),
+        });
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Erro ao criar categoria');
+        }
+        return response.ok;
+    },
+
+    fetchCategories: async (type = '') => {
+        const url = type ? `/api/categories?type=${type}` : '/api/categories';
+        const response = await fetch(url, { headers: headers() });
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Erro ao buscar categorias');
+        }
+        return await response.json();
+    },
+
     fetchGroupUsers: async () => {
         const response = await fetch('/api/users/list', { headers: headers() });
         return await response.json();

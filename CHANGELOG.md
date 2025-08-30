@@ -47,3 +47,18 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 -   Arquivos `public/transferencia.html` e `public/js/transferencia.js`.
 -   Arquivos `public/administracao.html` e `public/js/admin.js`.
 -   Importação desnecessária de Bootstrap em `public/js/main.js` que causava `TypeError`.
+
+## [1.1.0] - 2024-07-30
+
+### Adicionado
+-   **Sistema de Categorias de Transações:**
+    -   Criação de categorias customizadas com nome e tipo (Entrada, Saída, ou Ambos) vinculadas ao grupo do usuário.
+    -   Formulário de cadastro de categorias na página "Contas Bancárias".
+    -   Campo de seleção de categoria no formulário de transações, filtrando opções com base no tipo de transação (Entrada/Saída).
+    -   Exibição do nome da categoria no histórico de transações.
+    -   Endpoints no backend para criar e listar categorias (`POST /api/categories`, `GET /api/categories`).
+    -   Campo `category_id` adicionado à tabela `transactions` no banco de dados.
+
+### Alterado
+-   **Interface de Criação de Categoria:**
+    -   Alterado o campo "Tipo" de um `dropdown` para `checkboxes` para selecionar Entrada, Saída ou Ambos, oferecendo maior flexibilidade na definição da categoria.

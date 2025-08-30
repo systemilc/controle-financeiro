@@ -27,7 +27,21 @@ db.serialize(() => {
             username TEXT UNIQUE,
             password TEXT,
             group_id INTEGER,
-            role TEXT DEFAULT 'user'
+            role TEXT DEFAULT 'user',
+            whatsapp TEXT,
+            instagram TEXT,
+            email TEXT UNIQUE,
+            consent_lgpd INTEGER DEFAULT 0
+        )
+    `);
+
+    db.run(`
+        CREATE TABLE IF NOT EXISTS categories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            type TEXT NOT NULL, -- 'income', 'expense', 'both'
+            group_id INTEGER NOT NULL,
+            FOREIGN KEY(group_id) REFERENCES users(group_id)
         )
     `);
 
@@ -64,6 +78,7 @@ db.serialize(() => {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER,
             account_id INTEGER,
+            category_id INTEGER, -- Nova coluna para categoria
             description TEXT,
             amount REAL,
             type TEXT,
@@ -73,7 +88,8 @@ db.serialize(() => {
             due_date TEXT,
             confirmed_at TEXT DEFAULT NULL,
             FOREIGN KEY(user_id) REFERENCES users(id),
-            FOREIGN KEY(account_id) REFERENCES accounts(id)
+            FOREIGN KEY(account_id) REFERENCES accounts(id),
+            FOREIGN KEY(category_id) REFERENCES categories(id)
         )
     `);
 
@@ -101,11 +117,17 @@ db.serialize(() => {
     });
     
     // Altera a tabela de transações para adicionar as colunas se elas não existirem
-    const transactionColumns = ['original_account_name', 'is_confirmed', 'created_at', 'due_date', 'confirmed_at'];
+    const transactionColumns = ['original_account_name', 'is_confirmed', 'created_at', 'due_date', 'confirmed_at', 'category_id']; // Adiciona category_id aqui
     transactionColumns.forEach(col => {
         db.all(`PRAGMA table_info(transactions)`, (err, tableInfo) => {
             if (!tableInfo || !Array.isArray(tableInfo) || !tableInfo.some(c => c.name === col)) {
-                db.run(`ALTER TABLE transactions ADD COLUMN ${col} TEXT`, (err) => {
+                let columnType = 'INTEGER'; // Tipo padrão para category_id
+                if (col === 'original_account_name' || col === 'created_at' || col === 'due_date' || col === 'confirmed_at') {
+                    columnType = 'TEXT';
+                } else if (col === 'is_confirmed') {
+                    columnType = 'INTEGER DEFAULT 0';
+                }
+                db.run(`ALTER TABLE transactions ADD COLUMN ${col} ${columnType}`, (err) => {
                     if (err) {
                         console.error(`Erro ao adicionar a coluna ${col} em transactions:`, err.message);
                     }
@@ -167,6 +189,46 @@ const authorizeRole = (requiredRole) => (req, res, next) => {
 };
 
 // --- ROTAS DA API ---
+
+// Rotas de Categoria
+app.post('/api/categories', authenticate, (req, res) => {
+    const { name, type } = req.body;
+    const groupId = req.groupId;
+
+    if (!name || !type) {
+        return res.status(400).json({ message: 'Nome e tipo da categoria são obrigatórios.' });
+    }
+
+    if (!['income', 'expense', 'both'].includes(type)) {
+        return res.status(400).json({ message: 'Tipo de categoria inválido. Use \'income\', \'expense\' ou \'both\'.' });
+    }
+
+    db.run(`INSERT INTO categories (name, type, group_id) VALUES (?, ?, ?)`, [name, type, groupId], function(err) {
+        if (err) {
+            return res.status(500).json({ message: 'Erro ao criar categoria', error: err.message });
+        }
+        res.status(201).json({ id: this.lastID, name, type, group_id: groupId });
+    });
+});
+
+app.get('/api/categories', authenticate, (req, res) => {
+    const groupId = req.groupId;
+    const { type } = req.query; // Pode filtrar por tipo
+    let query = `SELECT * FROM categories WHERE group_id = ?`;
+    const params = [groupId];
+
+    if (type && ['income', 'expense', 'both'].includes(type)) {
+        query += ` AND (type = ? OR type = 'both')`;
+        params.push(type);
+    }
+
+    db.all(query, params, (err, rows) => {
+        if (err) {
+            return res.status(500).json({ message: 'Erro ao buscar categorias', error: err.message });
+        }
+        res.json(rows);
+    });
+});
 
 app.post('/api/register', (req, res) => {
     const { username, password, whatsapp, instagram, email, consent_lgpd } = req.body;
@@ -425,18 +487,18 @@ app.delete('/api/accounts/:id', authenticate, (req, res) => {
 });
 
 app.post('/api/transactions', authenticate, (req, res) => {
-    const { description, amount, type, account_id, due_date } = req.body;
+    const { description, amount, type, account_id, due_date, category_id } = req.body; // Adiciona category_id
     const userId = req.userId;
-    if (!account_id) {
-        return res.status(400).json({ message: 'O ID da conta é obrigatório.' });
+    if (!account_id || !category_id) { // category_id agora é obrigatório
+        return res.status(400).json({ message: 'O ID da conta e o ID da categoria são obrigatórios.' });
     }
-    db.run(`INSERT INTO transactions (user_id, account_id, description, amount, type, due_date) VALUES (?, ?, ?, ?, ?, ?)`,
-        [userId, account_id, description, amount, type, due_date],
+    db.run(`INSERT INTO transactions (user_id, account_id, category_id, description, amount, type, due_date) VALUES (?, ?, ?, ?, ?, ?, ?)`, // Adiciona category_id aqui
+        [userId, account_id, category_id, description, amount, type, due_date],
         function (err) {
             if (err) {
                 return res.status(500).json({ message: 'Erro ao adicionar transação', error: err.message });
             }
-            res.status(201).json({ id: this.lastID, description, amount, type, account_id, due_date, created_at: new Date().toISOString() });
+            res.status(201).json({ id: this.lastID, description, amount, type, account_id, due_date, category_id, created_at: new Date().toISOString() }); // Retorna category_id
         }
     );
 });
@@ -473,10 +535,11 @@ app.get('/api/transactions', authenticate, (req, res) => {
     console.log('Buscando transações para o Group ID:', groupId);
 
     db.all(`
-        SELECT t.*, a.name as account_name, u.username as creator_name
+        SELECT t.*, a.name as account_name, u.username as creator_name, c.name as category_name
         FROM transactions t
         LEFT JOIN accounts a ON t.account_id = a.id
         LEFT JOIN users u ON t.user_id = u.id
+        LEFT JOIN categories c ON t.category_id = c.id -- JOIN com a tabela categories
         WHERE a.group_id = ?
         ORDER BY t.id DESC
     `, [groupId], (err, rows) => {
@@ -511,10 +574,15 @@ app.get('/api/accounts', authenticate, (req, res) => {
 
 app.put('/api/transactions/:id', authenticate, (req, res) => {
     const { id } = req.params;
-    const { description, amount, type, account_id, due_date } = req.body;
+    const { description, amount, type, account_id, due_date, category_id } = req.body; // Adiciona category_id
     const userId = req.userId;
-    db.run(`UPDATE transactions SET description = ?, amount = ?, type = ?, account_id = ?, due_date = ? WHERE id = ? AND user_id = ?`,
-        [description, amount, type, account_id, due_date, id, userId],
+
+    if (!category_id) { // category_id agora é obrigatório na edição
+        return res.status(400).json({ message: 'O ID da categoria é obrigatório.' });
+    }
+
+    db.run(`UPDATE transactions SET description = ?, amount = ?, type = ?, account_id = ?, due_date = ?, category_id = ? WHERE id = ? AND user_id = ?`, // Adiciona category_id aqui
+        [description, amount, type, account_id, due_date, category_id, id, userId],
         function (err) {
             if (err) {
                 return res.status(500).json({ message: 'Erro ao atualizar transação', error: err.message });

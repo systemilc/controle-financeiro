@@ -111,6 +111,14 @@ export const elements = {
     editGroupIdInput: document.getElementById('edit-group-id'),
     editUserErrorMessage: document.getElementById('edit-user-error-message'),
 
+    // Gerenciar Categorias
+    categoryNameInput: document.getElementById('category-name'),
+    categoryTypeIncomeCheckbox: document.getElementById('category-type-income'), // Novo
+    categoryTypeExpenseCheckbox: document.getElementById('category-type-expense'), // Novo
+    categoryForm: document.getElementById('category-form'),
+    categoriesList: document.getElementById('categories-list'),
+    categorySelect: document.getElementById('category-select'), // Select de categoria no formulário de transações
+
     // Alterar Senha (Modal)
     changePasswordModal: document.getElementById('changePasswordModal'),
     changePasswordForm: document.getElementById('change-password-form'),
@@ -434,6 +442,44 @@ export const render = {
             elements.accountsList.appendChild(li);
         });
     },
+
+    // Categorias
+    renderCategoriesList: (categories) => {
+        elements.categoriesList.innerHTML = '';
+        if (!categories || categories.length === 0) {
+            elements.categoriesList.innerHTML = '<li class="list-group-item text-center">Nenhuma categoria encontrada.</li>';
+            return;
+        }
+        categories.forEach(category => {
+            const li = document.createElement('li');
+            li.className = 'list-group-item d-flex justify-content-between align-items-center';
+            li.innerHTML = `
+                <span>${category.name} (${category.type})</span>
+                <div>
+                    <button class="btn btn-danger btn-sm delete-category-button" data-id="${category.id}" data-name="${category.name}">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            `;
+            elements.categoriesList.appendChild(li);
+        });
+    },
+
+    populateCategorySelect: (transactionType) => {
+        const selectElement = elements.categorySelect;
+        selectElement.innerHTML = '<option value="">Selecione a Categoria</option>';
+
+        const filteredCategories = state.allCategories.filter(cat => 
+            cat.type === 'both' || cat.type === transactionType
+        );
+
+        filteredCategories.forEach(category => {
+            const option = document.createElement('option');
+            option.value = category.id;
+            option.textContent = `${category.name} (${category.type})`;
+            selectElement.appendChild(option);
+        });
+    },
     
     // Funções de transferência
     populateTransferSelects: () => {
@@ -501,7 +547,8 @@ export const render = {
                         <small class="text-muted">
                             Conta: ${accountName} | 
                             Criado por: ${transaction.creator_name || 'N/A'} | 
-                            Data: ${transaction.due_date || 'N/A'}
+                            Data: ${transaction.due_date || 'N/A'} | 
+                            Categoria: ${transaction.category_name || 'N/A'}
                         </small>
                     </div>
                     <div class="text-end">
@@ -570,6 +617,7 @@ export const render = {
         elements.amountInput.value = '';
         elements.typeInput.value = 'income';
         elements.accountSelect.value = '';
+        elements.categorySelect.value = ''; // Limpa a seleção de categoria
         elements.transactionDateInput.value = '';
         elements.transactionDateDisplayInput.value = '';
         elements.formTitle.textContent = 'Adicionar Transação';

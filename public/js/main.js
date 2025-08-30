@@ -22,6 +22,16 @@ const fetchAllData = async () => {
             console.error('Erro ao carregar contas:', accountsData.message);
         }
 
+        // Busca categorias
+        const categoriesData = await api.fetchCategories();
+        if (Array.isArray(categoriesData)) {
+            state.allCategories = categoriesData;
+            render.renderCategoriesList(categoriesData); // Renderiza a lista de categorias
+            render.populateCategorySelect(elements.typeInput.value); // Popula o select de categoria inicialmente com o tipo de transação padrão
+        } else {
+            console.error('Erro ao carregar categorias:', categoriesData.message);
+        }
+
         const transactionsData = await api.fetchTransactions();
         
         if (Array.isArray(transactionsData)) {
@@ -528,11 +538,12 @@ const handleTransactionFormSubmit = async (e) => {
     const amount = parseFloat(elements.amountInput.value);
     const type = elements.typeInput.value;
     const account_id = elements.accountSelect.value;
+    const category_id = elements.categorySelect.value; // Pega o ID da categoria
     const due_date = elements.transactionDateInput.value;
 
-    if (!description || !amount || !account_id || !due_date) return;
+    if (!description || !amount || !account_id || !due_date || !category_id) return; // category_id agora é obrigatório
 
-    const transactionData = { description, amount, type, account_id, due_date };
+    const transactionData = { description, amount, type, account_id, due_date, category_id }; // Inclui category_id
 
     if (transactionId) {
         const success = await api.editTransaction(transactionId, transactionData);
@@ -566,6 +577,10 @@ const editTransaction = async (id) => {
         elements.transactionDateDisplayInput.value = formatDateForDisplay(displayDate);
         elements.formTitle.textContent = 'Editar Transação';
         elements.submitButton.textContent = 'Atualizar';
+        
+        // Popula e pré-seleciona a categoria com base no tipo de transação
+        render.populateCategorySelect(transaction.type); 
+        elements.categorySelect.value = transaction.category_id; 
         
         // Navega para a página de transações
         render.showPage('transacoes');
@@ -830,6 +845,54 @@ elements.consentLgpdCheckbox.addEventListener('change', (e) => {
     } else {
         e.target.setCustomValidity('Você deve concordar com os termos da LGPD.');
     }
+});
+
+// Event listeners para o formulário de categorias
+const handleCategoryFormSubmit = async (e) => {
+    e.preventDefault();
+    const name = elements.categoryNameInput.value;
+    const isIncome = elements.categoryTypeIncomeCheckbox.checked;
+    const isExpense = elements.categoryTypeExpenseCheckbox.checked;
+
+    let type = '';
+    if (isIncome && isExpense) {
+        type = 'both';
+    } else if (isIncome) {
+        type = 'income';
+    } else if (isExpense) {
+        type = 'expense';
+    } else {
+        alert('Por favor, selecione pelo menos um tipo (Entrada ou Saída) para a categoria.');
+        return;
+    }
+
+    if (!name) {
+        alert('Por favor, preencha o nome da categoria.');
+        return;
+    }
+
+    try {
+        const success = await api.createCategory(name, type);
+        if (success) {
+            alert('Categoria adicionada com sucesso!');
+            elements.categoryNameInput.value = '';
+            elements.categoryTypeIncomeCheckbox.checked = false; // Limpa o checkbox
+            elements.categoryTypeExpenseCheckbox.checked = false; // Limpa o checkbox
+            fetchAllData(); // Atualiza a lista de categorias e transações
+        } else {
+            alert('Erro ao adicionar categoria. Tente novamente.');
+        }
+    } catch (error) {
+        console.error('Erro ao adicionar categoria:', error);
+        alert(`Erro ao adicionar categoria: ${error.message || 'Erro desconhecido'}`);
+    }
+};
+
+elements.categoryForm.addEventListener('submit', handleCategoryFormSubmit);
+
+// Event listener para mudança no tipo de transação (Entrada/Saída)
+elements.typeInput.addEventListener('change', (e) => {
+    render.populateCategorySelect(e.target.value);
 });
 
 // Event listeners para transferência

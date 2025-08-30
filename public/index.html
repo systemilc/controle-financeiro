@@ -238,74 +238,124 @@
 
                 <!-- Contas Bancárias -->
                 <div id="contas-page" class="page-content hidden">
-                    <div class="row">
-                        <div class="col-md-6 mb-4">
-                            <div class="card p-3 shadow-sm">
+                    <div class="container mt-4">
+                        <h2 class="mb-4">Gerenciar Contas Bancárias</h2>
+
+                        <!-- Formulário para Adicionar Nova Conta -->
+                        <div class="card mb-4 shadow-sm">
+                            <div class="card-header bg-primary text-white">Adicionar Nova Conta</div>
+                            <div class="card-body">
                                 <form id="account-form">
-                                    <h2 class="text-primary">Adicionar Conta</h2>
                                     <div class="mb-3">
-                                        <label for="account-name" class="form-label">Nome da Conta:</label>
-                                        <input type="text" class="form-control" id="account-name" required>
+                                        <label for="account-name" class="form-label">Nome da Conta</label>
+                                        <input type="text" class="form-control" id="account-name" placeholder="Ex: Conta Corrente, Poupança" required>
                                     </div>
-                                    <button type="submit" class="btn btn-primary w-100">Adicionar Conta</button>
+                                    <button type="submit" class="btn btn-primary"><i class="fas fa-plus-circle"></i> Adicionar Conta</button>
                                 </form>
                             </div>
-                            
                         </div>
-                        <div class="col-md-6 mb-4">
-                            <div class="card p-3 shadow-sm">
-                                <h2 class="text-primary">Lista de Contas</h2>
-                                <ul id="accounts-list" class="list-group list-group-flush"></ul>
+
+                        <!-- Lista de Contas Existentes -->
+                        <div class="card mb-4 shadow-sm">
+                            <div class="card-header bg-info text-white">Contas Existentes</div>
+                            <ul id="accounts-list" class="list-group list-group-flush">
+                                <!-- Contas serão carregadas aqui -->
+                            </ul>
+                        </div>
+
+                        <h2 class="mb-4">Gerenciar Categorias</h2>
+
+                        <!-- Formulário para Adicionar Nova Categoria -->
+                        <div class="card mb-4 shadow-sm">
+                            <div class="card-header bg-primary text-white">Adicionar Nova Categoria</div>
+                            <div class="card-body">
+                                <form id="category-form">
+                                    <div class="mb-3">
+                                        <label for="category-name" class="form-label">Nome da Categoria</label>
+                                        <input type="text" class="form-control" id="category-name" placeholder="Ex: Salário, Aluguel, Alimentação" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Tipo</label><br>
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="checkbox" id="category-type-income" value="income">
+                                            <label class="form-check-label" for="category-type-income">Entrada</label>
+                                        </div>
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="checkbox" id="category-type-expense" value="expense">
+                                            <label class="form-check-label" for="category-type-expense">Saída</label>
+                                        </div>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary"><i class="fas fa-plus-circle"></i> Adicionar Categoria</button>
+                                </form>
                             </div>
+                        </div>
+
+                        <!-- Lista de Categorias Existentes -->
+                        <div class="card mb-4 shadow-sm">
+                            <div class="card-header bg-info text-white">Categorias Existentes</div>
+                            <ul id="categories-list" class="list-group list-group-flush">
+                                <!-- Categorias serão carregadas aqui -->
+                            </ul>
                         </div>
                     </div>
                 </div>
 
                 <!-- Transações -->
                 <div id="transacoes-page" class="page-content hidden">
-                    <div class="row">
-                        <div class="col-md-6 mb-4">
-                            <div class="card p-3 shadow-sm">
+                    <div class="container mt-4">
+                        <h2 id="form-title" class="mb-4">Adicionar Transação</h2>
+                        <div class="card mb-4 shadow-sm">
+                            <div class="card-body">
                                 <form id="transaction-form">
-                                    <h2 id="form-title" class="text-primary">Adicionar Transação</h2>
                                     <input type="hidden" id="transaction-id">
                                     <div class="mb-3">
-                                        <label for="account-select" class="form-label">Conta:</label>
-                                        <select class="form-select" id="account-select" required></select>
+                                        <label for="description" class="form-label">Descrição</label>
+                                        <input type="text" class="form-control" id="description" placeholder="Ex: Salário, Aluguel, Compras" required>
                                     </div>
                                     <div class="mb-3">
-                                        <label for="description" class="form-label">Descrição:</label>
-                                        <input type="text" class="form-control" id="description" required>
+                                        <label for="amount" class="form-label">Valor</label>
+                                        <input type="number" step="0.01" class="form-control" id="amount" placeholder="Ex: 1500.00" required>
                                     </div>
                                     <div class="mb-3">
-                                        <label for="amount" class="form-label">Valor:</label>
-                                        <input type="number" class="form-control" id="amount" step="0.01" required>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label for="type" class="form-label">Tipo:</label>
+                                        <label for="type" class="form-label">Tipo</label>
                                         <select class="form-select" id="type" required>
-                                            <option value="income">Receita</option>
-                                            <option value="expense">Despesa</option>
+                                            <option value="income">Entrada</option>
+                                            <option value="expense">Saída</option>
                                         </select>
                                     </div>
                                     <div class="mb-3">
-                                        <label for="transaction-date" class="form-label">Data da Transação:</label>
+                                        <label for="account-select" class="form-label">Conta</label>
+                                        <select class="form-select" id="account-select" required>
+                                            <!-- Opções de contas serão carregadas aqui -->
+                                        </select>
+                                    </div>
+                                    <!-- Nova seleção de categoria -->
+                                    <div class="mb-3">
+                                        <label for="category-select" class="form-label">Categoria</label>
+                                        <select class="form-select" id="category-select" required>
+                                            <option value="">Selecione a Categoria</option>
+                                            <!-- Opções de categorias serão carregadas aqui -->
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="transaction-date-display" class="form-label">Data de Vencimento/Ocorrência</label>
                                         <div class="input-group">
-                                            <span class="input-group-text calendar-icon-btn"><i class="fas fa-calendar-alt"></i></span>
-                                            <input type="date" class="form-control d-none" id="transaction-date" required>
-                                            <input type="text" class="form-control" id="transaction-date-display" readonly>
+                                            <input type="text" class="form-control" id="transaction-date-display" readonly placeholder="DD/MM/AAAA">
+                                            <button class="btn btn-outline-secondary calendar-icon-btn" type="button" id="button-addon2">
+                                                <i class="far fa-calendar-alt"></i>
+                                            </button>
+                                            <input type="date" class="form-control hidden" id="transaction-date">
                                         </div>
                                     </div>
-                                    <button type="submit" id="submit-button" class="btn btn-primary w-100">Adicionar</button>
+                                    <button type="submit" class="btn btn-primary" id="submit-button"><i class="fas fa-plus-circle"></i> Adicionar</button>
                                 </form>
                             </div>
                         </div>
-                        <div class="col-md-6 mb-4">
-                            <div class="card p-3 shadow-sm">
-                                <h2 class="text-primary">Histórico de Transações</h2>
-                                <ul id="transaction-list" class="list-group list-group-flush"></ul>
-                            </div>
-                        </div>
+
+                        <h2 class="mb-4">Histórico de Transações</h2>
+                        <ul id="transaction-list" class="list-group mb-4">
+                            <!-- Transações serão carregadas aqui -->
+                        </ul>
                     </div>
                 </div>
 
@@ -504,4 +554,5 @@
             </div>
         </div>
     </div>
+</div>
 </div>
