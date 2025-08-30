@@ -1040,5 +1040,16 @@ if (elements.changePasswordModal) {
     elements.changePasswordModal.addEventListener('hidden.bs.modal', render.resetChangePasswordForm);
 }
 
+// Carrega a versão do aplicativo do package.json e exibe no footer
+fetch('package.json')
+    .then(response => response.json())
+    .then(data => {
+        const appVersionElement = document.getElementById('app-version');
+        if (appVersionElement) {
+            appVersionElement.textContent = data.version;
+        }
+    })
+    .catch(error => console.error('Erro ao carregar a versão do aplicativo:', error));
+
 // Inicialização
 init();

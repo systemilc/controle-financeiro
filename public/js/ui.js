@@ -454,7 +454,7 @@ export const render = {
             const li = document.createElement('li');
             li.className = 'list-group-item d-flex justify-content-between align-items-center';
             li.innerHTML = `
-                <span>${category.name} (${category.type})</span>
+                <span>${category.name}</span>
                 <div>
                     <button class="btn btn-danger btn-sm delete-category-button" data-id="${category.id}" data-name="${category.name}">
                         <i class="fas fa-trash"></i>
@@ -476,7 +476,7 @@ export const render = {
         filteredCategories.forEach(category => {
             const option = document.createElement('option');
             option.value = category.id;
-            option.textContent = `${category.name} (${category.type})`;
+            option.textContent = category.name; // Apenas o nome da categoria
             selectElement.appendChild(option);
         });
     },
