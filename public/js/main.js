@@ -12,6 +12,7 @@ const fetchAllData = async () => {
         }
 
         const accountsData = await api.fetchAccounts();
+        const categoriesData = await api.fetchCategories(); // Busca as categorias
         
         if (Array.isArray(accountsData)) {
             state.allAccounts = accountsData;
@@ -20,6 +21,14 @@ const fetchAllData = async () => {
             render.populateTransferSelects(); // Popula os selects de transferência
         } else {
             console.error('Erro ao carregar contas:', accountsData.message);
+        }
+
+        if (Array.isArray(categoriesData)) {
+            state.allCategories = categoriesData; // Armazena as categorias no estado
+            render.populateCategorySelect(state.allCategories, elements.typeInput.value); // Popula o select de categorias no formulário de transação
+            render.renderCategoriesList(state.allCategories); // Renderiza a lista de categorias na página de categorias
+        } else {
+            console.error('Erro ao carregar categorias:', categoriesData.message);
         }
 
         // Coleta os parâmetros de filtro
@@ -537,6 +546,7 @@ const handleTransactionFormSubmit = async (e) => {
     const amount = parseFloat(elements.amountInput.value);
     const type = elements.typeInput.value;
     const account_id = elements.accountSelect.value;
+    const category_id = elements.categorySelect.value || null; // Pega o ID da categoria, ou null se não selecionada
     const original_due_date = elements.transactionDateInput.value; // Data de vencimento base
     const multiplier = parseInt(elements.multiplierInput.value) || 1; // Valor do multiplicador
 
@@ -547,7 +557,7 @@ const handleTransactionFormSubmit = async (e) => {
 
     // Se for uma edição, ignora o multiplicador
     if (transactionId) {
-        const transactionData = { description, amount, type, account_id, due_date: original_due_date };
+        const transactionData = { description, amount, type, account_id, due_date: original_due_date, category_id };
         const success = await api.editTransaction(transactionId, transactionData);
         if (success) {
             render.resetForm();
@@ -571,7 +581,8 @@ const handleTransactionFormSubmit = async (e) => {
                 amount,
                 type,
                 account_id,
-                due_date: current_due_date
+                due_date: current_due_date,
+                category_id
             };
 
             const success = await api.createTransaction(transactionData);
@@ -833,7 +844,7 @@ const init = () => {
 
         // Verifica se há hash na URL para navegar para a página correta
         const hash = window.location.hash.replace('#', '');
-        if (hash && ['dashboard', 'contas', 'transacoes', 'usuarios', 'transferencia', 'register', 'admin-users'].includes(hash)) {
+        if (hash && ['dashboard', 'contas', 'categorias', 'transacoes', 'usuarios', 'transferencia', 'register', 'admin-users'].includes(hash)) {
             render.showPage(hash);
         } else {
             render.showPage('dashboard');
@@ -845,6 +856,9 @@ const init = () => {
 elements.loginForm.addEventListener('submit', handleLogin);
 elements.accountForm.addEventListener('submit', handleAccountFormSubmit);
 elements.transactionForm.addEventListener('submit', handleTransactionFormSubmit);
+elements.typeInput.addEventListener('change', () => {
+    render.populateCategorySelect(state.allCategories, elements.typeInput.value);
+});
 elements.transferForm.addEventListener('submit', handleTransferSubmit); // Novo listener para transferência
 elements.logoutButton.addEventListener('click', logout);
 elements.addUserForm.addEventListener('submit', handleAddUserFormSubmit);
@@ -1020,6 +1034,84 @@ elements.transactionDateInput.addEventListener('change', () => {
 
 elements.calendarIconBtn.addEventListener('click', () => {
     elements.transactionDateInput.showPicker();
+});
+
+// Eventos das categorias
+const handleCategoryFormSubmit = async (e) => {
+    e.preventDefault();
+    const categoryName = elements.categoryNameInput.value;
+    const categoryType = elements.categoryTypeSelect.value;
+    const categoryId = elements.categoryForm.dataset.editingId; // Para edição
+
+    if (!categoryName || !categoryType) {
+        alert('Por favor, preencha o nome e selecione o tipo da categoria.');
+        return;
+    }
+
+    try {
+        let success;
+        if (categoryId) {
+            success = await api.editCategory(categoryId, categoryName, categoryType);
+            if (success) alert('Categoria atualizada com sucesso!');
+            elements.categoryForm.removeAttribute('data-editing-id');
+        } else {
+            success = await api.createCategory(categoryName, categoryType);
+            if (success) alert('Categoria adicionada com sucesso!');
+        }
+        
+        if (success) {
+            elements.categoryNameInput.value = '';
+            elements.categoryTypeSelect.value = '';
+            fetchAllData(); // Recarrega todas as categorias
+        } else {
+            alert('Erro ao salvar categoria. Verifique se já existe uma categoria com este nome e tipo.');
+        }
+    } catch (error) {
+        console.error('Erro ao salvar categoria:', error);
+        alert(`Erro ao salvar categoria: ${error.message || 'Erro desconhecido'}`);
+    }
+};
+
+const deleteCategory = async (id, name) => {
+    if (!confirm(`Tem certeza que deseja deletar a categoria "${name}"? Isso não poderá ser desfeito.`)) return;
+
+    try {
+        const success = await api.deleteCategory(id);
+        if (success) {
+            alert('Categoria deletada com sucesso!');
+            fetchAllData(); // Atualiza a lista após deletar
+        } else {
+            alert('Erro ao deletar categoria.');
+        }
+    } catch (error) {
+        console.error('Erro ao deletar categoria:', error);
+        alert(`Erro ao deletar categoria: ${error.message || 'Erro desconhecido'}`);
+    }
+};
+
+const editCategory = async (id, name, type) => {
+    elements.categoryNameInput.value = name;
+    elements.categoryTypeSelect.value = type;
+    elements.categoryForm.dataset.editingId = id; // Armazena o ID da categoria que está sendo editada
+    elements.categoryForm.querySelector('button[type="submit"]').textContent = 'Atualizar Categoria';
+};
+
+elements.categoryForm.addEventListener('submit', handleCategoryFormSubmit);
+elements.categoriesList.addEventListener('click', async (e) => {
+    const target = e.target.closest('button');
+    if (!target) return;
+
+    const id = target.dataset.id;
+    const name = target.dataset.name;
+    const type = target.dataset.type;
+
+    if (!id) return;
+
+    if (target.classList.contains('delete-category-button')) {
+        deleteCategory(id, name);
+    } else if (target.classList.contains('edit-category-button')) {
+        editCategory(id, name, type);
+    }
 });
 
 // Event listener para o modal de alteração de senha, para resetar o formulário ao fechar

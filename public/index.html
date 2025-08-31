@@ -34,49 +34,53 @@
     </div>
 
     <!-- Tela de Cadastro -->
-    <div id="register-screen" class="container d-flex justify-content-center align-items-center vh-100 hidden">
-        <div class="card p-4 shadow-sm w-100" style="max-width: 400px;">
-            <h1 class="card-title text-center text-primary">Criar Nova Conta</h1>
-            <form id="register-form">
-                <div class="mb-3">
-                    <label for="register-username" class="form-label">Nome de Usuário:</label>
-                    <input type="text" class="form-control" id="register-username" required>
+    <div id="register-screen" class="container py-5 hidden">
+        <div class="row justify-content-center">
+            <div class="col-md-8 col-lg-6">
+                <div class="card p-4 shadow-sm w-100 mx-auto" style="max-width: 400px; overflow-y: auto; max-height: 85vh;">
+                    <h1 class="card-title text-center text-primary">Criar Nova Conta</h1>
+                    <form id="register-form">
+                        <div class="mb-3">
+                            <label for="register-username" class="form-label">Nome de Usuário:</label>
+                            <input type="text" class="form-control" id="register-username" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="register-password" class="form-label">Senha:</label>
+                            <input type="password" class="form-control" id="register-password" minlength="6" required>
+                            <small class="form-text text-muted">Mínimo 6 caracteres, com maiúscula, minúscula, número e caractere especial.</small>
+                            <div id="password-strength" class="mt-1"></div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="register-confirm-password" class="form-label">Confirmar Senha:</label>
+                            <input type="password" class="form-control" id="register-confirm-password" minlength="6" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="register-whatsapp" class="form-label">WhatsApp:</label>
+                            <input type="text" class="form-control" id="register-whatsapp" placeholder="(XX) XXXXX-XXXX">
+                        </div>
+                        <div class="mb-3">
+                            <label for="register-instagram" class="form-label">Instagram:</label>
+                            <input type="text" class="form-control" id="register-instagram" placeholder="@seuinstagram">
+                        </div>
+                        <div class="mb-3">
+                            <label for="register-email" class="form-label">Email:</label>
+                            <input type="email" class="form-control" id="register-email" required>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input type="checkbox" class="form-check-input" id="consent-lgpd" required>
+                            <label class="form-check-label" for="consent-lgpd">
+                                Concordo com o <a href="#" data-bs-toggle="modal" data-bs-target="#lgpdModal">Termo de Consentimento</a> e aceito ser contatado via redes sociais para fins de marketing.
+                            </label>
+                            <div class="invalid-feedback">Você deve concordar para prosseguir.</div>
+                        </div>
+                        <button type="submit" class="btn btn-success w-100">Cadastrar</button>
+                        <p id="register-error-message" class="text-danger text-center mt-3 hidden"></p>
+                        <p class="text-center mt-3 mb-0">
+                            Já tem uma conta? <a href="#login" data-page="login" id="show-login-link">Faça login aqui</a>
+                        </p>
+                    </form>
                 </div>
-                <div class="mb-3">
-                    <label for="register-password" class="form-label">Senha:</label>
-                    <input type="password" class="form-control" id="register-password" minlength="6" required>
-                    <small class="form-text text-muted">Mínimo 6 caracteres, com maiúscula, minúscula, número e caractere especial.</small>
-                    <div id="password-strength" class="mt-1"></div>
-                </div>
-                <div class="mb-3">
-                    <label for="register-confirm-password" class="form-label">Confirmar Senha:</label>
-                    <input type="password" class="form-control" id="register-confirm-password" minlength="6" required>
-                </div>
-                <div class="mb-3">
-                    <label for="register-whatsapp" class="form-label">WhatsApp:</label>
-                    <input type="text" class="form-control" id="register-whatsapp" placeholder="(XX) XXXXX-XXXX">
-                </div>
-                <div class="mb-3">
-                    <label for="register-instagram" class="form-label">Instagram:</label>
-                    <input type="text" class="form-control" id="register-instagram" placeholder="@seuinstagram">
-                </div>
-                <div class="mb-3">
-                    <label for="register-email" class="form-label">Email:</label>
-                    <input type="email" class="form-control" id="register-email" required>
-                </div>
-                <div class="form-check mb-3">
-                    <input type="checkbox" class="form-check-input" id="consent-lgpd" required>
-                    <label class="form-check-label" for="consent-lgpd">
-                        Concordo com o <a href="#" data-bs-toggle="modal" data-bs-target="#lgpdModal">Termo de Consentimento</a> e aceito ser contatado via redes sociais para fins de marketing.
-                    </label>
-                    <div class="invalid-feedback">Você deve concordar para prosseguir.</div>
-                </div>
-                <button type="submit" class="btn btn-success w-100">Cadastrar</button>
-                <p id="register-error-message" class="text-danger text-center mt-3 hidden"></p>
-                <p class="text-center mt-3 mb-0">
-                    Já tem uma conta? <a href="#login" data-page="login" id="show-login-link">Faça login aqui</a>
-                </p>
-            </form>
+            </div>
         </div>
     </div>
 
@@ -125,6 +129,12 @@
                     <a class="nav-link" href="#contas" data-page="contas">
                         <i class="fas fa-university me-2"></i>
                         <span class="nav-text">Contas Bancárias</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#categorias" data-page="categorias">
+                        <i class="fas fa-tags me-2"></i>
+                        <span class="nav-text">Categorias</span>
                     </a>
                 </li>
                 <li class="nav-item">
@@ -255,6 +265,38 @@
                     </div>
                 </div>
 
+                <!-- Categorias -->
+                <div id="categorias-page" class="page-content hidden">
+                    <div class="row">
+                        <div class="col-md-6 mb-4">
+                            <div class="card p-3 shadow-sm">
+                                <form id="category-form">
+                                    <h2 class="text-primary">Adicionar Categoria</h2>
+                                    <div class="mb-3">
+                                        <label for="category-name" class="form-label">Nome da Categoria:</label>
+                                        <input type="text" class="form-control" id="category-name" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="category-type" class="form-label">Tipo:</label>
+                                        <select class="form-select" id="category-type" required>
+                                            <option value="">Selecione o tipo</option>
+                                            <option value="income">Receita</option>
+                                            <option value="expense">Despesa</option>
+                                        </select>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary w-100">Adicionar Categoria</button>
+                                </form>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-4">
+                            <div class="card p-3 shadow-sm">
+                                <h2 class="text-primary">Lista de Categorias</h2>
+                                <ul id="categories-list" class="list-group list-group-flush"></ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Transações -->
                 <div id="transacoes-page" class="page-content hidden">
                     <!-- Seção Adicionar Transação (agora no topo) -->
@@ -274,6 +316,12 @@
                                             <select class="form-select" id="type" required>
                                                 <option value="income">Receita</option>
                                                 <option value="expense">Despesa</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-12">
+                                            <label for="category-select" class="form-label">Categoria:</label>
+                                            <select class="form-select" id="category-select">
+                                                <option value="">Nenhuma</option>
                                             </select>
                                         </div>
                                         <div class="col-md-12">
@@ -390,6 +438,7 @@
                                                      <th style="width: 100px;">Valor</th>
                                                      <th style="width: 80px;">Tipo</th>
                                                      <th style="width: 120px;">Conta</th>
+                                                     <th style="width: 120px;">Categoria</th>
                                                      <th style="width: 120px;">Lançamento</th>
                                                      <th style="width: 120px;">Vencimento</th>
                                                      <th style="width: 120px;">Confirmação</th>
@@ -410,12 +459,15 @@
 
                 <!-- Usuários -->
                 <div id="usuarios-page" class="page-content hidden">
-                    <div class="row">
-                        <div class="col-md-6 mb-4">
-                            <div class="card p-3 shadow-sm">
+                    <div class="row justify-content-center">
+                        <div class="col-md-8 mb-4">
+                            <div class="card p-3 shadow-sm mb-4">
                                 <h2 class="text-primary">Usuários do Grupo</h2>
                                 <ul id="group-users-list" class="list-group list-group-flush"></ul>
-                                <form id="add-user-form" class="mt-3 hidden">
+                            </div>
+                            <div class="card p-3 shadow-sm">
+                                <h2 class="text-primary">Adicionar Colaborador</h2>
+                                <form id="add-user-form" class="mt-3">
                                     <div class="mb-3">
                                         <label for="new-username" class="form-label">Nome do novo usuário:</label>
                                         <input type="text" class="form-control" id="new-username" required>

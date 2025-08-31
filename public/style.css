@@ -414,9 +414,9 @@ header {
     background-color: var(--danger-color);
     color: white;
     border: none;
-    border-radius: 50%;
-    width: 30px;
-    height: 30px;
+    border-radius: 10%;
+    width: 80px;
+    height: 25px;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -433,15 +433,16 @@ header {
     background-color: var(--warning-color);
     color: white;
     border: none;
-    border-radius: 50%;
-    width: 30px;
-    height: 30px;
+    border-radius: 10%;
+    width: 80px;
+    height: 25px;
     display: flex;
     justify-content: center;
     align-items: center;
     font-size: 0.9em;
     transition: background-color 0.2s ease, transform 0.2s ease;
     margin-right: 5px;
+    margin-bottom: 5px;
 }
 
 .edit-admin-user-button:hover, .edit-collaborator-button:hover {

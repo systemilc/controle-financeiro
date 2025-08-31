@@ -38,6 +38,7 @@ export const elements = {
     contasPage: document.getElementById('contas-page'),
     transacoesPage: document.getElementById('transacoes-page'),
     usuariosPage: document.getElementById('usuarios-page'),
+    categoriasPage: document.getElementById('categorias-page'), // Nova página de categorias
     
     // Dashboard
     totalIncomeEl: document.getElementById('total-income'),
@@ -80,6 +81,13 @@ export const elements = {
     transactionTableBody: document.getElementById('transaction-table-body'),
     calendarIconBtn: document.querySelector('.calendar-icon-btn'),
     multiplierInput: document.getElementById('multiplier-input'), // Novo campo multiplicador
+    
+    // Categorias
+    categoryNameInput: document.getElementById('category-name'),
+    categoryTypeSelect: document.getElementById('category-type'),
+    categoryForm: document.getElementById('category-form'),
+    categoriesList: document.getElementById('categories-list'),
+    categorySelect: document.getElementById('category-select'), // Select de categorias no formulário de transações
     
     // Filtros de Transações
     transactionFiltersForm: document.getElementById('transaction-filters-form'),
@@ -526,6 +534,7 @@ export const render = {
                 <td class="${amountClass} text-end">${amountPrefix}R$ ${parseFloat(transaction.amount).toFixed(2).replace('.', ',')}</td>
                 <td>${transaction.type === 'income' ? 'Receita' : 'Despesa'}</td>
                 <td>${accountName}</td>
+                <td>${transaction.category_name || 'N/A'}</td>
                 <td>${formatDateForDisplay(transaction.created_at)}</td>
                 <td>${transaction.due_date ? formatDateForDisplay(transaction.due_date) : 'N/A'}</td>
                 <td>${transaction.is_confirmed && transaction.confirmed_at ? formatDateForDisplay(transaction.confirmed_at) : 'Não Confirmada'}</td>
@@ -562,13 +571,13 @@ export const render = {
                     <small class="text-muted">LGPD: ${user.consent_lgpd === 1 ? 'Sim' : 'Não'}</small>
                 </div>
                 <div>
-                   <button class="btn btn-info btn-sm me-2 edit-collaborator-button" data-id="${user.id}">
-                       <i class="fas fa-edit"></i> Editar
+                   <button class="btn btn-sm me-2 edit-collaborator-button table-action-btn" data-id="${user.id}" title="Editar">
+                       <i class="fas fa-edit"></i>
                    </button>
                     ${user.id == state.userId ? 
-                        '<span class="badge bg-secondary">Não pode deletar</span>' : 
-                        `<button class="btn btn-danger btn-sm delete-collaborator-button" data-id="${user.id}" data-username="${user.username}">
-                            <i class="fas fa-trash"></i> Deletar
+                        '<span class="badge cannot-delete-badge">Não pode deletar</span>' : 
+                        `<button class="btn btn-sm delete-collaborator-button table-action-btn" data-id="${user.id}" data-username="${user.username}" title="Deletar">
+                            <i class="fas fa-trash"></i>
                         </button>`
                     }
                 </div>
@@ -589,6 +598,7 @@ export const render = {
         elements.formTitle.textContent = 'Adicionar Transação';
         elements.submitButton.textContent = 'Adicionar';
         elements.multiplierInput.value = 1; // Reseta o multiplicador para 1
+        elements.categorySelect.value = ''; // Reseta o campo de categoria
         // As linhas de reset para os campos de adição de usuário foram movidas para serem chamadas apenas após o sucesso do cadastro.
     },
     
@@ -691,4 +701,48 @@ export const render = {
    hideChangePasswordError: () => {
        elements.changePasswordErrorMessage.classList.add('hidden');
    },
+
+    // Categorias
+    renderCategoriesList: (categories) => {
+        elements.categoriesList.innerHTML = '';
+        if (!categories || categories.length === 0) {
+            elements.categoriesList.innerHTML = '<li class="list-group-item text-center text-muted">Nenhuma categoria cadastrada.</li>';
+            return;
+        }
+        categories.forEach(category => {
+            const li = document.createElement('li');
+            li.className = 'list-group-item d-flex justify-content-between align-items-center';
+            const typeBadgeClass = category.type === 'income' ? 'bg-success' : 'bg-danger';
+            const typeText = category.type === 'income' ? 'Receita' : 'Despesa';
+            li.innerHTML = `
+                <div>
+                    <strong>${category.name}</strong>
+                    <span class="badge ${typeBadgeClass} ms-2">${typeText}</span>
+                </div>
+                <div>
+                    <button class="btn btn-info btn-sm me-2 edit-category-button" data-id="${category.id}" data-name="${category.name}" data-type="${category.type}">
+                        <i class="fas fa-edit"></i> Editar
+                    </button>
+                    <button class="btn btn-danger btn-sm delete-category-button" data-id="${category.id}" data-name="${category.name}">
+                        <i class="fas fa-trash"></i> Deletar
+                    </button>
+                </div>
+            `;
+            elements.categoriesList.appendChild(li);
+        });
+    },
+
+    populateCategorySelect: (categories, currentType) => {
+        elements.categorySelect.innerHTML = '<option value="">Nenhuma</option>';
+        const filteredCategories = categories.filter(cat => !currentType || cat.type === currentType);
+
+        filteredCategories.forEach(category => {
+            const option = document.createElement('option');
+            option.value = category.id;
+            option.textContent = category.name;
+            elements.categorySelect.appendChild(option);
+        });
+    },
 };
+
+// Funções de transferência

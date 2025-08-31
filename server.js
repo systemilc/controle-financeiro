@@ -58,12 +58,24 @@ db.serialize(() => {
             group_id INTEGER
         )
     `);
+
+    db.run(`
+        CREATE TABLE IF NOT EXISTS categories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            group_id INTEGER,
+            name TEXT NOT NULL,
+            type TEXT NOT NULL, -- 'income' ou 'expense'
+            UNIQUE(group_id, name, type), -- Garante que não haja categorias duplicadas por grupo/tipo
+            FOREIGN KEY(group_id) REFERENCES users(group_id)
+        )
+    `);
     
     db.run(`
         CREATE TABLE IF NOT EXISTS transactions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER,
             account_id INTEGER,
+            category_id INTEGER, -- Nova coluna para a categoria
             description TEXT,
             amount REAL,
             type TEXT,
@@ -74,7 +86,8 @@ db.serialize(() => {
             confirmed_at TEXT DEFAULT NULL,
             is_transfer INTEGER DEFAULT 0, -- Nova coluna
             FOREIGN KEY(user_id) REFERENCES users(id),
-            FOREIGN KEY(account_id) REFERENCES accounts(id)
+            FOREIGN KEY(account_id) REFERENCES accounts(id),
+            FOREIGN KEY(category_id) REFERENCES categories(id)
         )
     `);
 
@@ -434,19 +447,19 @@ app.delete('/api/accounts/:id', authenticate, (req, res) => {
 });
 
 app.post('/api/transactions', authenticate, (req, res) => {
-    const { description, amount, type, account_id, due_date, is_transfer } = req.body;
+    const { description, amount, type, account_id, due_date, is_transfer, category_id } = req.body; // Adicionado category_id
     const userId = req.userId;
     if (!account_id) {
         return res.status(400).json({ message: 'O ID da conta é obrigatório.' });
     }
-    db.run(`INSERT INTO transactions (user_id, account_id, description, amount, type, due_date, is_transfer) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [userId, account_id, description, amount, type, due_date, is_transfer ? 1 : 0],
+    db.run(`INSERT INTO transactions (user_id, account_id, description, amount, type, due_date, is_transfer, category_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [userId, account_id, description, amount, type, due_date, is_transfer ? 1 : 0, category_id || null],
         function (err) {
             if (err) {
                 console.error('Erro ao inserir transação no banco de dados:', err.message); // Adicionado para depuração
                 return res.status(500).json({ message: 'Erro ao adicionar transação', error: err.message });
             }
-            res.status(201).json({ id: this.lastID, description, amount, type, account_id, due_date, created_at: new Date().toISOString() });
+            res.status(201).json({ id: this.lastID, description, amount, type, account_id, due_date, created_at: new Date().toISOString(), category_id });
         }
     );
 });
@@ -520,10 +533,11 @@ app.get('/api/transactions', authenticate, (req, res) => {
     }
 
     let query = `
-        SELECT t.*, a.name as account_name, u.username as creator_name, t.is_transfer
+        SELECT t.*, a.name as account_name, u.username as creator_name, c.name as category_name, t.is_transfer
         FROM transactions t
         LEFT JOIN accounts a ON t.account_id = a.id
         LEFT JOIN users u ON t.user_id = u.id
+        LEFT JOIN categories c ON t.category_id = c.id
     `;
 
     if (whereClauses.length > 0) {
@@ -549,15 +563,15 @@ app.get('/api/transactions', authenticate, (req, res) => {
 
 app.put('/api/transactions/:id', authenticate, (req, res) => {
     const { id } = req.params;
-    const { description, amount, type, account_id, due_date } = req.body;
+    const { description, amount, type, account_id, due_date, category_id } = req.body; // Adicionado category_id
     const userId = req.userId;
     db.run(`
         UPDATE transactions
-        SET description = ?, amount = ?, type = ?, account_id = ?, due_date = ?
+        SET description = ?, amount = ?, type = ?, account_id = ?, due_date = ?, category_id = ?
         WHERE id = ?
           AND account_id IN (SELECT id FROM accounts WHERE group_id = ?)
     `,
-        [description, amount, type, account_id, due_date, id, req.groupId],
+        [description, amount, type, account_id, due_date, category_id || null, id, req.groupId],
         function (err) {
             if (err) {
                 return res.status(500).json({ message: 'Erro ao atualizar transação', error: err.message });
@@ -588,7 +602,112 @@ app.delete('/api/transactions/:id', authenticate, (req, res) => {
     });
 });
 
-// Nova rota DELETE para /api/users/:id para lidar com deleção por admin ou user
+// --- ROTAS DA API DE CATEGORIAS ---
+
+// POST: Criar uma nova categoria
+app.post('/api/categories', authenticate, (req, res) => {
+    const { name, type } = req.body;
+    const groupId = req.groupId;
+
+    if (!name || !type || (type !== 'income' && type !== 'expense')) {
+        return res.status(400).json({ message: 'Nome e tipo (income/expense) da categoria são obrigatórios.' });
+    }
+
+    db.run(`INSERT INTO categories (group_id, name, type) VALUES (?, ?, ?)`, [groupId, name, type], function(err) {
+        if (err) {
+            if (err.message.includes('UNIQUE constraint failed')) {
+                return res.status(400).json({ message: 'Já existe uma categoria com este nome e tipo para o seu grupo.' });
+            }
+            console.error('Erro ao inserir categoria no banco de dados:', err.message);
+            return res.status(500).json({ message: 'Erro ao criar categoria', error: err.message });
+        }
+        res.status(201).json({ id: this.lastID, name, type, group_id: groupId });
+    });
+});
+
+// GET: Listar todas as categorias do grupo do usuário
+app.get('/api/categories', authenticate, (req, res) => {
+    const groupId = req.groupId;
+    const { type } = req.query; // Pode filtrar por tipo (income/expense)
+
+    let query = `SELECT id, name, type, group_id FROM categories WHERE group_id = ?`;
+    let params = [groupId];
+
+    if (type && (type === 'income' || type === 'expense')) {
+        query += ` AND type = ?`;
+        params.push(type);
+    }
+
+    query += ` ORDER BY name ASC`;
+
+    db.all(query, params, (err, rows) => {
+        if (err) {
+            console.error('Erro ao buscar categorias no banco de dados:', err.message);
+            return res.status(500).json({ message: 'Erro ao buscar categorias', error: err.message });
+        }
+        res.json(rows);
+    });
+});
+
+// PUT: Atualizar uma categoria
+app.put('/api/categories/:id', authenticate, (req, res) => {
+    const { id } = req.params;
+    const { name, type } = req.body;
+    const groupId = req.groupId;
+
+    if (!name || !type || (type !== 'income' && type !== 'expense')) {
+        return res.status(400).json({ message: 'Nome e tipo (income/expense) da categoria são obrigatórios para atualização.' });
+    }
+
+    db.run(`
+        UPDATE categories
+        SET name = ?, type = ?
+        WHERE id = ? AND group_id = ?
+    `, [name, type, id, groupId], function(err) {
+        if (err) {
+            if (err.message.includes('UNIQUE constraint failed')) {
+                return res.status(400).json({ message: 'Já existe uma categoria com este nome e tipo para o seu grupo.' });
+            }
+            console.error('Erro ao atualizar categoria no banco de dados:', err.message);
+            return res.status(500).json({ message: 'Erro ao atualizar categoria', error: err.message });
+        }
+        if (this.changes === 0) {
+            return res.status(404).json({ message: 'Categoria não encontrada ou sem permissão para atualizar.' });
+        }
+        res.status(200).json({ message: 'Categoria atualizada com sucesso!' });
+    });
+});
+
+// DELETE: Deletar uma categoria
+app.delete('/api/categories/:id', authenticate, (req, res) => {
+    const { id } = req.params;
+    const groupId = req.groupId;
+
+    // Verifica se a categoria está sendo usada por alguma transação
+    db.get(`SELECT COUNT(*) as count FROM transactions WHERE category_id = ? AND account_id IN (SELECT id FROM accounts WHERE group_id = ?)`, [id, groupId], (err, row) => {
+        if (err) {
+            console.error('Erro ao verificar uso da categoria:', err.message);
+            return res.status(500).json({ message: 'Erro ao verificar uso da categoria', error: err.message });
+        }
+        if (row.count > 0) {
+            return res.status(400).json({ message: 'Não é possível deletar esta categoria. Ela está vinculada a transações existentes.' });
+        }
+
+        db.run(`DELETE FROM categories WHERE id = ? AND group_id = ?`, [id, groupId], function(err) {
+            if (err) {
+                console.error('Erro ao deletar categoria no banco de dados:', err.message);
+                return res.status(500).json({ message: 'Erro ao deletar categoria', error: err.message });
+            }
+            if (this.changes === 0) {
+                return res.status(404).json({ message: 'Categoria não encontrada ou sem permissão para deletar.' });
+            }
+            res.status(200).json({ message: 'Categoria deletada com sucesso!' });
+        });
+    });
+});
+
+// --- ROTAS DA API DE USUÁRIOS ---
+
 app.delete('/api/users/:id', authenticate, async (req, res) => {
     const { id } = req.params;
     const userIdToDelete = parseInt(id);

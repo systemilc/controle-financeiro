@@ -158,4 +158,42 @@ export const api = {
         }
         return response.ok;
     },
+
+    // --- API DE CATEGORIAS ---
+
+    fetchCategories: async (type = '') => {
+        const queryString = type ? `?type=${type}` : '';
+        const response = await fetch(`/api/categories${queryString}`, { headers: headers() });
+        return await response.json();
+    },
+
+    createCategory: async (name, type) => {
+        const response = await fetch('/api/categories', {
+            method: 'POST',
+            headers: headers(),
+            body: JSON.stringify({ name, type }),
+        });
+        return response.ok;
+    },
+
+    editCategory: async (id, name, type) => {
+        const response = await fetch(`/api/categories/${id}`, {
+            method: 'PUT',
+            headers: headers(),
+            body: JSON.stringify({ name, type }),
+        });
+        return response.ok;
+    },
+
+    deleteCategory: async (id) => {
+        const response = await fetch(`/api/categories/${id}`, {
+            method: 'DELETE',
+            headers: headers(),
+        });
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Erro ao deletar categoria');
+        }
+        return response.ok;
+    },
 };
