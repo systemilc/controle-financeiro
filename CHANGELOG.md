@@ -62,3 +62,11 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 ### Alterado
 -   **Interface de Criação de Categoria:**
     -   Alterado o campo "Tipo" de um `dropdown` para `checkboxes` para selecionar Entrada, Saída ou Ambos, oferecendo maior flexibilidade na definição da categoria.
+
+## [1.2.0] - 2024-07-30
+
+### Adicionado
+-   **Lançamento Parcelado de Transações:**
+    -   Funcionalidade para replicar uma transação X vezes, com intervalo de um mês entre as datas de vencimento/ocorrência.
+    -   Campo "Número de Parcelas" adicionado ao formulário de transações para especificar a quantidade de repetições.
+    -   As transações parceladas são criadas com a `due_date` ajustada automaticamente para os meses subsequentes.

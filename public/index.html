@@ -242,60 +242,70 @@
                         <h2 class="mb-4">Gerenciar Contas Bancárias</h2>
 
                         <!-- Formulário para Adicionar Nova Conta -->
-                        <div class="card mb-4 shadow-sm">
-                            <div class="card-header bg-primary text-white">Adicionar Nova Conta</div>
-                            <div class="card-body">
-                                <form id="account-form">
-                                    <div class="mb-3">
-                                        <label for="account-name" class="form-label">Nome da Conta</label>
-                                        <input type="text" class="form-control" id="account-name" placeholder="Ex: Conta Corrente, Poupança" required>
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <div class="card shadow-sm h-100">
+                                    <div class="card-header bg-primary text-white">Adicionar Nova Conta</div>
+                                    <div class="card-body">
+                                        <form id="account-form">
+                                            <div class="mb-3">
+                                                <label for="account-name" class="form-label">Nome da Conta</label>
+                                                <input type="text" class="form-control" id="account-name" placeholder="Ex: Conta Corrente, Poupança" required>
+                                            </div>
+                                            <button type="submit" class="btn btn-primary"><i class="fas fa-plus-circle"></i> Adicionar Conta</button>
+                                        </form>
                                     </div>
-                                    <button type="submit" class="btn btn-primary"><i class="fas fa-plus-circle"></i> Adicionar Conta</button>
-                                </form>
+                                </div>
                             </div>
-                        </div>
-
-                        <!-- Lista de Contas Existentes -->
-                        <div class="card mb-4 shadow-sm">
-                            <div class="card-header bg-info text-white">Contas Existentes</div>
-                            <ul id="accounts-list" class="list-group list-group-flush">
-                                <!-- Contas serão carregadas aqui -->
-                            </ul>
+                            <div class="col-md-6">
+                                <!-- Lista de Contas Existentes -->
+                                <div class="card shadow-sm h-100">
+                                    <div class="card-header bg-info text-white">Contas Existentes</div>
+                                    <ul id="accounts-list" class="list-group list-group-flush">
+                                        <!-- Contas serão carregadas aqui -->
+                                    </ul>
+                                </div>
+                            </div>
                         </div>
 
                         <h2 class="mb-4">Gerenciar Categorias</h2>
 
-                        <!-- Formulário para Adicionar Nova Categoria -->
-                        <div class="card mb-4 shadow-sm">
-                            <div class="card-header bg-primary text-white">Adicionar Nova Categoria</div>
-                            <div class="card-body">
-                                <form id="category-form">
-                                    <div class="mb-3">
-                                        <label for="category-name" class="form-label">Nome da Categoria</label>
-                                        <input type="text" class="form-control" id="category-name" placeholder="Ex: Salário, Aluguel, Alimentação" required>
+                        <!-- Formulário e Lista de Categorias -->
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <div class="card shadow-sm h-100">
+                                    <div class="card-header bg-primary text-white">Adicionar Nova Categoria</div>
+                                    <div class="card-body">
+                                        <form id="category-form">
+                                            <div class="mb-3">
+                                                <label for="category-name" class="form-label">Nome da Categoria</label>
+                                                <input type="text" class="form-control" id="category-name" placeholder="Ex: Salário, Aluguel, Alimentação" required>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">Tipo</label><br>
+                                                <div class="form-check form-check-inline">
+                                                    <input class="form-check-input" type="checkbox" id="category-type-income" value="income">
+                                                    <label class="form-check-label" for="category-type-income">Entrada</label>
+                                                </div>
+                                                <div class="form-check form-check-inline">
+                                                    <input class="form-check-input" type="checkbox" id="category-type-expense" value="expense">
+                                                    <label class="form-check-label" for="category-type-expense">Saída</label>
+                                                </div>
+                                            </div>
+                                            <button type="submit" class="btn btn-primary"><i class="fas fa-plus-circle"></i> Adicionar Categoria</button>
+                                        </form>
                                     </div>
-                                    <div class="mb-3">
-                                        <label class="form-label">Tipo</label><br>
-                                        <div class="form-check form-check-inline">
-                                            <input class="form-check-input" type="checkbox" id="category-type-income" value="income">
-                                            <label class="form-check-label" for="category-type-income">Entrada</label>
-                                        </div>
-                                        <div class="form-check form-check-inline">
-                                            <input class="form-check-input" type="checkbox" id="category-type-expense" value="expense">
-                                            <label class="form-check-label" for="category-type-expense">Saída</label>
-                                        </div>
-                                    </div>
-                                    <button type="submit" class="btn btn-primary"><i class="fas fa-plus-circle"></i> Adicionar Categoria</button>
-                                </form>
+                                </div>
                             </div>
-                        </div>
-
-                        <!-- Lista de Categorias Existentes -->
-                        <div class="card mb-4 shadow-sm">
-                            <div class="card-header bg-info text-white">Categorias Existentes</div>
-                            <ul id="categories-list" class="list-group list-group-flush">
-                                <!-- Categorias serão carregadas aqui -->
-                            </ul>
+                            <div class="col-md-6">
+                                <!-- Lista de Categorias Existentes -->
+                                <div class="card shadow-sm h-100">
+                                    <div class="card-header bg-info text-white">Categorias Existentes</div>
+                                    <ul id="categories-list" class="list-group list-group-flush">
+                                        <!-- Categorias serão carregadas aqui -->
+                                    </ul>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -303,54 +313,70 @@
                 <!-- Transações -->
                 <div id="transacoes-page" class="page-content hidden">
                     <div class="container mt-4">
-                        <h2 id="form-title" class="mb-4">Adicionar Transação</h2>
-                        <div class="card mb-4 shadow-sm">
-                            <div class="card-body">
-                                <form id="transaction-form">
-                                    <input type="hidden" id="transaction-id">
-                                    <div class="mb-3">
-                                        <label for="description" class="form-label">Descrição</label>
-                                        <input type="text" class="form-control" id="description" placeholder="Ex: Salário, Aluguel, Compras" required>
+                        <h2 id="form-title" class="mb-4 text-center">Adicionar Transação</h2>
+                        <div class="row justify-content-center mb-4">
+                            <div class="col-lg-8">
+                                <div class="card shadow-sm">
+                                    <div class="card-body">
+                                        <form id="transaction-form">
+                                            <input type="hidden" id="transaction-id">
+                                            <div class="mb-3">
+                                                <label for="description" class="form-label">Descrição</label>
+                                                <input type="text" class="form-control" id="description" placeholder="Ex: Salário, Aluguel, Compras" required>
+                                            </div>
+                                            
+                            <!-- Grupo: Valor, Data e Parcelas -->
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <label for="amount" class="form-label">Valor</label>
+                                    <input type="number" step="0.01" class="form-control" id="amount" placeholder="Ex: 1500.00" required>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="transaction-date-display" class="form-label">Data de Vencimento/Ocorrência</label>
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" id="transaction-date-display" placeholder="DD/MM/AAAA">
+                                        <button class="btn btn-outline-secondary calendar-icon-btn" type="button" id="button-addon2">
+                                            <i class="far fa-calendar-alt"></i>
+                                        </button>
+                                        <input type="date" class="form-control hidden" id="transaction-date">
                                     </div>
-                                    <div class="mb-3">
-                                        <label for="amount" class="form-label">Valor</label>
-                                        <input type="number" step="0.01" class="form-control" id="amount" placeholder="Ex: 1500.00" required>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label for="type" class="form-label">Tipo</label>
-                                        <select class="form-select" id="type" required>
-                                            <option value="income">Entrada</option>
-                                            <option value="expense">Saída</option>
-                                        </select>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label for="account-select" class="form-label">Conta</label>
-                                        <select class="form-select" id="account-select" required>
-                                            <!-- Opções de contas serão carregadas aqui -->
-                                        </select>
-                                    </div>
-                                    <!-- Nova seleção de categoria -->
-                                    <div class="mb-3">
-                                        <label for="category-select" class="form-label">Categoria</label>
-                                        <select class="form-select" id="category-select" required>
-                                            <option value="">Selecione a Categoria</option>
-                                            <!-- Opções de categorias serão carregadas aqui -->
-                                        </select>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label for="transaction-date-display" class="form-label">Data de Vencimento/Ocorrência</label>
-                                        <div class="input-group">
-                                            <input type="text" class="form-control" id="transaction-date-display" readonly placeholder="DD/MM/AAAA">
-                                            <button class="btn btn-outline-secondary calendar-icon-btn" type="button" id="button-addon2">
-                                                <i class="far fa-calendar-alt"></i>
-                                            </button>
-                                            <input type="date" class="form-control hidden" id="transaction-date">
-                                        </div>
-                                    </div>
-                                    <button type="submit" class="btn btn-primary" id="submit-button"><i class="fas fa-plus-circle"></i> Adicionar</button>
-                                </form>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="num-parcels" class="form-label">Parcelas (> 1 para replicar)</label>
+                                    <input type="number" class="form-control" id="num-parcels" value="1" min="1">
+                                </div>
                             </div>
-                        </div>
+
+                            <!-- Grupo: Tipo e Conta -->
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="type" class="form-label">Tipo</label>
+                                    <select class="form-select" id="type" required>
+                                        <option value="income">Entrada</option>
+                                        <option value="expense">Saída</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="account-select" class="form-label">Conta</label>
+                                    <select class="form-select" id="account-select" required>
+                                        <!-- Opções de contas serão carregadas aqui -->
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Nova seleção de categoria -->
+                            <div class="mb-3">
+                                <label for="category-select" class="form-label">Categoria</label>
+                                <select class="form-select" id="category-select" required>
+                                    <option value="">Selecione a Categoria</option>
+                                    <!-- Opções de categorias serão carregadas aqui -->
+                                </select>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary w-100" id="submit-button"><i class="fas fa-plus-circle"></i> Adicionar</button>
+                        </form>
+                    </div>
+                </div>
 
                         <h2 class="mb-4">Histórico de Transações</h2>
                         <ul id="transaction-list" class="list-group mb-4">
@@ -474,7 +500,7 @@
 
     <footer class="footer mt-auto py-3 bg-light">
         <div class="container text-center">
-            <span class="text-muted">Controle Financeiro Pessoal - Versão 1.0.0.1 <span id="app-version"></span></span>
+            <span class="text-muted">Controle Financeiro Pessoal - Versão <span id="app-version"></span></span>
         </div>
     </footer>
 </body>

@@ -540,27 +540,60 @@ const handleTransactionFormSubmit = async (e) => {
     const account_id = elements.accountSelect.value;
     const category_id = elements.categorySelect.value; // Pega o ID da categoria
     const due_date = elements.transactionDateInput.value;
+    const numParcels = parseInt(elements.numParcelsInput.value); // Pega o número de parcelas
 
-    if (!description || !amount || !account_id || !due_date || !category_id) return; // category_id agora é obrigatório
+    if (!description || !amount || !account_id || !due_date || !category_id) {
+        alert('Por favor, preencha todos os campos obrigatórios (Descrição, Valor, Conta, Categoria e Data).');
+        return;
+    }
 
-    const transactionData = { description, amount, type, account_id, due_date, category_id }; // Inclui category_id
+    if (numParcels <= 0 || isNaN(numParcels)) {
+        alert('O número de parcelas deve ser um valor positivo.');
+        return;
+    }
 
-    if (transactionId) {
-        const success = await api.editTransaction(transactionId, transactionData);
-        if (success) {
-            render.resetForm();
-            fetchAllData();
-        } else {
-            alert('Erro ao atualizar transação.');
+    if (transactionId && numParcels > 1) {
+        alert('Não é possível parcelar uma transação existente. Edite-a individualmente.');
+        return;
+    }
+
+    let transactionsToCreate = [];
+    if (numParcels > 1) {
+        for (let i = 0; i < numParcels; i++) {
+            const parcelDate = addMonthsToDate(due_date, i); // Usa a nova função
+            transactionsToCreate.push({
+                description: `${description} (${i + 1}/${numParcels})`,
+                amount,
+                type,
+                account_id,
+                due_date: parcelDate, // Já formatado corretamente
+                category_id
+            });
         }
     } else {
-        const success = await api.createTransaction(transactionData);
-        if (success) {
+        transactionsToCreate.push({ description, amount, type, account_id, due_date, category_id });
+    }
+
+    try {
+        let allSuccess = true;
+        for (const transaction of transactionsToCreate) {
+            const success = await api.createTransaction(transaction);
+            if (!success) {
+                allSuccess = false;
+                break;
+            }
+        }
+
+        if (allSuccess) {
             render.resetForm();
             fetchAllData();
+            alert(`${numParcels > 1 ? 'Transações parceladas' : 'Transação'} adicionada com sucesso!`);
         } else {
-            alert('Erro ao adicionar transação.');
+            alert('Erro ao adicionar transação(ões). Tente novamente.');
         }
+    } catch (error) {
+        console.error('Erro na transação:', error);
+        alert(`Erro ao adicionar transação(ões): ${error.message || 'Erro desconhecido'}`);
     }
 };
 
@@ -572,15 +605,21 @@ const editTransaction = async (id) => {
         elements.typeInput.value = transaction.type;
         elements.accountSelect.value = transaction.account_id;
         elements.transactionIdInput.value = transaction.id;
-        const displayDate = transaction.due_date ? transaction.due_date : getTodayDate();
-        elements.transactionDateInput.value = displayDate;
-        elements.transactionDateDisplayInput.value = formatDateForDisplay(displayDate);
+        
+        // Define o valor do input oculto e do campo de exibição usando as funções utilitárias
+        elements.transactionDateInput.value = formatDateForInput(transaction.due_date); // YYYY-MM-DD
+        elements.transactionDateDisplayInput.value = formatDateForDisplay(transaction.due_date); // DD/MM/YYYY
+
         elements.formTitle.textContent = 'Editar Transação';
         elements.submitButton.textContent = 'Atualizar';
         
         // Popula e pré-seleciona a categoria com base no tipo de transação
         render.populateCategorySelect(transaction.type); 
         elements.categorySelect.value = transaction.category_id; 
+
+        // Ao editar, o campo de parcelas deve ser 1 e desabilitado
+        elements.numParcelsInput.value = 1;
+        elements.numParcelsInput.disabled = true;
         
         // Navega para a página de transações
         render.showPage('transacoes');
@@ -1028,11 +1067,25 @@ elements.accountsList.addEventListener('click', (e) => {
 
 // Eventos do calendário
 elements.transactionDateInput.addEventListener('change', () => {
+    // Quando o input type="date" (oculto) muda, atualiza o campo de exibição
     elements.transactionDateDisplayInput.value = formatDateForDisplay(elements.transactionDateInput.value);
 });
 
 elements.calendarIconBtn.addEventListener('click', () => {
     elements.transactionDateInput.showPicker();
+});
+
+// Event listener para permitir digitar a data diretamente
+elements.transactionDateDisplayInput.addEventListener('input', (e) => {
+    const inputDate = e.target.value;
+    const formattedDateForInput = parseAndFormatDate(inputDate);
+    if (formattedDateForInput) {
+        elements.transactionDateInput.value = formattedDateForInput;
+        elements.transactionDateDisplayInput.setCustomValidity('');
+    } else {
+        elements.transactionDateInput.value = ''; // Limpa o campo oculto se a data for inválida
+        elements.transactionDateDisplayInput.setCustomValidity('Formato de data inválido. Use DD/MM/AAAA.');
+    }
 });
 
 // Event listener para o modal de alteração de senha, para resetar o formulário ao fechar
@@ -1041,12 +1094,22 @@ if (elements.changePasswordModal) {
 }
 
 // Carrega a versão do aplicativo do package.json e exibe no footer
-fetch('package.json')
-    .then(response => response.json())
+console.log('Tentando carregar package.json para a versão...');
+fetch('../package.json')
+    .then(response => {
+        console.log('Resposta do fetch para package.json:', response);
+        if (!response.ok) {
+            throw new Error(`Erro HTTP! status: ${response.status}`);
+        }
+        return response.json();
+    })
     .then(data => {
+        console.log('Dados do package.json carregados:', data);
         const appVersionElement = document.getElementById('app-version');
+        console.log('Elemento app-version encontrado:', appVersionElement);
         if (appVersionElement) {
             appVersionElement.textContent = data.version;
+            console.log('Versão definida no rodapé:', data.version);
         }
     })
     .catch(error => console.error('Erro ao carregar a versão do aplicativo:', error));

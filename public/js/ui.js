@@ -80,6 +80,7 @@ export const elements = {
     transactionForm: document.getElementById('transaction-form'),
     transactionList: document.getElementById('transaction-list'),
     calendarIconBtn: document.querySelector('.calendar-icon-btn'),
+    numParcelsInput: document.getElementById('num-parcels'), // Novo elemento
     
     // Usuários
     newUsernameInput: document.getElementById('new-username'),
@@ -630,6 +631,8 @@ export const render = {
         elements.newInstagramInput.closest('.mb-3').style.display = 'block'; // Garante que o campo Instagram esteja visível
         elements.newEmailInput.value = ''; // Limpa o campo de Email do formulário de adicionar usuário
         elements.newEmailInput.closest('.mb-3').style.display = 'block'; // Garante que o campo Email esteja visível
+        elements.numParcelsInput.value = 1; // Reseta para 1 parcela
+        elements.numParcelsInput.disabled = false; // Habilita o campo de parcelas
     },
     
     // Reset do formulário de transferência
