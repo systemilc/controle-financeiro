@@ -1,6 +1,3 @@
-Para deixar o `README` adequado para o GitHub, vou usar a formatação Markdown para cabeçalhos, listas, negrito e blocos de código.
-
-Aqui está o conteúdo completo, formatado e pronto para você copiar e colar em um arquivo chamado `README.md` na pasta raiz do seu projeto.
 
 -----
 
