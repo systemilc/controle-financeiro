@@ -1,7 +1,7 @@
 import { state } from './state.js';
 import { api } from './api.js';
 import { elements, render } from './ui.js';
-import { getTodayDate } from './utils.js';
+import { getTodayDate, addMonthsToDate } from './utils.js';
 
 const fetchAllData = async () => {
     try {
@@ -22,17 +22,9 @@ const fetchAllData = async () => {
             console.error('Erro ao carregar contas:', accountsData.message);
         }
 
-        // Busca categorias
-        const categoriesData = await api.fetchCategories();
-        if (Array.isArray(categoriesData)) {
-            state.allCategories = categoriesData;
-            render.renderCategoriesList(categoriesData); // Renderiza a lista de categorias
-            render.populateCategorySelect(elements.typeInput.value); // Popula o select de categoria inicialmente com o tipo de transação padrão
-        } else {
-            console.error('Erro ao carregar categorias:', categoriesData.message);
-        }
-
-        const transactionsData = await api.fetchTransactions();
+        // Coleta os parâmetros de filtro
+        const filters = collectTransactionFilters();
+        const transactionsData = await api.fetchTransactions(filters);
         
         if (Array.isArray(transactionsData)) {
             render.transactions(transactionsData);
@@ -188,6 +180,11 @@ const handleNavigation = (e) => {
         history.pushState({ page: pageName }, '', `#${pageName}`);
         // Fecha o menu mobile se estiver aberto
         closeMobileMenu();
+
+        // Se for uma página de usuários ou dashboard, recarrega os dados
+        if (pageName === 'usuarios' || pageName === 'admin-users' || pageName === 'dashboard') {
+            fetchAllData();
+        }
     }
 };
 
@@ -305,8 +302,8 @@ const handleChangePasswordSubmit = async (e) => {
     render.hideChangePasswordError();
 
     const currentPassword = elements.currentPasswordInput.value;
-    const newPassword = elements.newPasswordInput.value;
-    const confirmNewPassword = elements.confirmNewPasswordInput.value;
+    const newPassword = elements.changePasswordNewPasswordInput.value; // Atualizado
+    const confirmNewPassword = elements.changePasswordConfirmNewPasswordInput.value; // Atualizado
 
     console.log('Senhas lidas:', {
         currentPassword,
@@ -320,22 +317,22 @@ const handleChangePasswordSubmit = async (e) => {
     }
 
     if (newPassword !== confirmNewPassword) {
-        elements.confirmNewPasswordInput.setCustomValidity('As novas senhas não coincidem.');
+        elements.changePasswordConfirmNewPasswordInput.setCustomValidity('As novas senhas não coincidem.'); // Atualizado
         // elements.confirmNewPasswordInput.reportValidity(); // Removido para evitar popup indesejado
         render.showChangePasswordError('As novas senhas não coincidem.');
         return;
     } else {
-        elements.confirmNewPasswordInput.setCustomValidity('');
+        elements.changePasswordConfirmNewPasswordInput.setCustomValidity(''); // Atualizado
     }
 
     const newPasswordStrength = getPasswordStrength(newPassword);
     if (newPasswordStrength.score < 3) {
-        elements.newPasswordInput.setCustomValidity('A nova senha é muito fraca.');
+        elements.changePasswordNewPasswordInput.setCustomValidity('A nova senha é muito fraca.'); // Atualizado
         // elements.newPasswordInput.reportValidity(); // Removido para evitar popup indesejado
         render.showChangePasswordError('A nova senha é muito fraca.');
         return;
     } else {
-        elements.newPasswordInput.setCustomValidity('');
+        elements.changePasswordNewPasswordInput.setCustomValidity(''); // Atualizado
     }
 
     try {
@@ -478,7 +475,8 @@ const handleTransferSubmit = async (e) => {
             amount: amount,
             type: 'expense',
             account_id: fromAccountId,
-            due_date: new Date().toISOString().split('T')[0]
+            due_date: new Date().toISOString().split('T')[0],
+            is_transfer: 1 // Marcar como transferência
         };
         
         const inTransaction = {
@@ -486,7 +484,8 @@ const handleTransferSubmit = async (e) => {
             amount: amount,
             type: 'income',
             account_id: toAccountId,
-            due_date: new Date().toISOString().split('T')[0]
+            due_date: new Date().toISOString().split('T')[0],
+            is_transfer: 1 // Marcar como transferência
         };
         
         // Cria as transações
@@ -538,62 +537,59 @@ const handleTransactionFormSubmit = async (e) => {
     const amount = parseFloat(elements.amountInput.value);
     const type = elements.typeInput.value;
     const account_id = elements.accountSelect.value;
-    const category_id = elements.categorySelect.value; // Pega o ID da categoria
-    const due_date = elements.transactionDateInput.value;
-    const numParcels = parseInt(elements.numParcelsInput.value); // Pega o número de parcelas
+    const original_due_date = elements.transactionDateInput.value; // Data de vencimento base
+    const multiplier = parseInt(elements.multiplierInput.value) || 1; // Valor do multiplicador
 
-    if (!description || !amount || !account_id || !due_date || !category_id) {
-        alert('Por favor, preencha todos os campos obrigatórios (Descrição, Valor, Conta, Categoria e Data).');
+    if (!description || !amount || !account_id || !original_due_date) {
+        alert('Por favor, preencha todos os campos obrigatórios para a transação.');
         return;
     }
 
-    if (numParcels <= 0 || isNaN(numParcels)) {
-        alert('O número de parcelas deve ser um valor positivo.');
-        return;
-    }
+    // Se for uma edição, ignora o multiplicador
+    if (transactionId) {
+        const transactionData = { description, amount, type, account_id, due_date: original_due_date };
+        const success = await api.editTransaction(transactionId, transactionData);
+        if (success) {
+            render.resetForm();
+            fetchAllData();
+        } else {
+            alert('Erro ao atualizar transação.');
+        }
+    } else {
+        // Nova transação, aplica o multiplicador
+        let allSuccess = true;
+        for (let i = 0; i < multiplier; i++) {
+            const current_due_date = addMonthsToDate(original_due_date, i);
+            let parcel_description = description;
 
-    if (transactionId && numParcels > 1) {
-        alert('Não é possível parcelar uma transação existente. Edite-a individualmente.');
-        return;
-    }
-
-    let transactionsToCreate = [];
-    if (numParcels > 1) {
-        for (let i = 0; i < numParcels; i++) {
-            const parcelDate = addMonthsToDate(due_date, i); // Usa a nova função
-            transactionsToCreate.push({
-                description: `${description} (${i + 1}/${numParcels})`,
+            if (multiplier > 1) {
+                parcel_description = `${description} ${i + 1}/${multiplier}`;
+            }
+            
+            const transactionData = {
+                description: parcel_description,
                 amount,
                 type,
                 account_id,
-                due_date: parcelDate, // Já formatado corretamente
-                category_id
-            });
-        }
-    } else {
-        transactionsToCreate.push({ description, amount, type, account_id, due_date, category_id });
-    }
+                due_date: current_due_date
+            };
 
-    try {
-        let allSuccess = true;
-        for (const transaction of transactionsToCreate) {
-            const success = await api.createTransaction(transaction);
+            const success = await api.createTransaction(transactionData);
             if (!success) {
                 allSuccess = false;
-                break;
+                // Não para o loop, mas registra o erro
+                console.error(`Erro ao criar transação para parcela ${i + 1}/${multiplier}`);
             }
         }
 
         if (allSuccess) {
+            alert(`${multiplier} transação(ões) adicionada(s) com sucesso!`);
             render.resetForm();
             fetchAllData();
-            alert(`${numParcels > 1 ? 'Transações parceladas' : 'Transação'} adicionada com sucesso!`);
         } else {
-            alert('Erro ao adicionar transação(ões). Tente novamente.');
+            alert('Algumas transações podem não ter sido adicionadas. Verifique o console para mais detalhes.');
+            fetchAllData(); // Atualiza mesmo com erros parciais
         }
-    } catch (error) {
-        console.error('Erro na transação:', error);
-        alert(`Erro ao adicionar transação(ões): ${error.message || 'Erro desconhecido'}`);
     }
 };
 
@@ -605,21 +601,11 @@ const editTransaction = async (id) => {
         elements.typeInput.value = transaction.type;
         elements.accountSelect.value = transaction.account_id;
         elements.transactionIdInput.value = transaction.id;
-        
-        // Define o valor do input oculto e do campo de exibição usando as funções utilitárias
-        elements.transactionDateInput.value = formatDateForInput(transaction.due_date); // YYYY-MM-DD
-        elements.transactionDateDisplayInput.value = formatDateForDisplay(transaction.due_date); // DD/MM/YYYY
-
+        const displayDate = transaction.due_date ? transaction.due_date : getTodayDate();
+        elements.transactionDateInput.value = displayDate;
+        elements.transactionDateDisplayInput.value = formatDateForDisplay(displayDate);
         elements.formTitle.textContent = 'Editar Transação';
         elements.submitButton.textContent = 'Atualizar';
-        
-        // Popula e pré-seleciona a categoria com base no tipo de transação
-        render.populateCategorySelect(transaction.type); 
-        elements.categorySelect.value = transaction.category_id; 
-
-        // Ao editar, o campo de parcelas deve ser 1 e desabilitado
-        elements.numParcelsInput.value = 1;
-        elements.numParcelsInput.disabled = true;
         
         // Navega para a página de transações
         render.showPage('transacoes');
@@ -692,24 +678,40 @@ const deleteAccount = async (id, name) => {
 const handleAddUserFormSubmit = async (e) => {
     e.preventDefault();
     const username = elements.newUsernameInput.value;
-    const password = elements.newPasswordInput.value;
+    const password = elements.addUserNotificationPasswordInput.value; // Atualizado
     const whatsapp = elements.newWhatsappInput.value;
     const instagram = elements.newInstagramInput.value;
     const email = elements.newEmailInput.value;
-    if (!username || !password) return;
     
-    const response = await api.addUserToGroup(username, password, whatsapp, instagram, email);
-    if (response.ok) {
-        elements.newUsernameInput.value = '';
-        elements.newPasswordInput.value = '';
-        elements.newWhatsappInput.value = '';
-        elements.newInstagramInput.value = '';
-        elements.newEmailInput.value = '';
-        fetchAllData();
-        alert('Usuário adicionado ao grupo com sucesso!');
-    } else {
-        const error = await response.json();
-        alert(`Erro ao adicionar usuário: ${error.message}`);
+    // Remover console.log de depuração
+
+    // Adicionar validação de campos obrigatórios
+    if (!username || !password || !email) {
+        alert('Por favor, preencha todos os campos obrigatórios: Nome de Usuário, Senha e Email.');
+        return;
+    }
+
+    try {
+        const response = await api.addUserToGroup(username, password, whatsapp, instagram, email);
+
+        if (response.ok) {
+            // Limpa o formulário apenas em caso de sucesso
+            elements.newUsernameInput.value = '';
+            elements.addUserNotificationPasswordInput.value = ''; // Atualizado
+            elements.newWhatsappInput.value = '';
+            elements.newInstagramInput.value = '';
+            elements.newEmailInput.value = '';
+            
+            fetchAllData();
+            alert('Usuário adicionado ao grupo com sucesso!');
+        } else {
+            const error = await response.json();
+            console.error('handleAddUserFormSubmit: Erro da API ao adicionar usuário', error);
+            alert(`Erro ao adicionar usuário: ${error.message || 'Erro desconhecido'}`);
+        }
+    } catch (error) {
+        console.error('handleAddUserFormSubmit: Erro na requisição', error);
+        alert(`Erro ao adicionar usuário: ${error.message || 'Erro de rede'}`);
     }
 };
 
@@ -722,7 +724,7 @@ const handleLogin = async (e) => {
     console.log('Username enviado:', username);
     console.log('Password enviado:', password);
 
-    let originalText = ''; // Declaração de originalText aqui
+    let originalText = ''; // Declaração de originalText movida para fora do try/catch
 
     try {
         // Mostra estado de loading
@@ -822,13 +824,6 @@ const init = () => {
         render.resetForm();
         fetchAllData();
         
-        // Controla a visibilidade do link "Gerenciar Usuários"
-        if (state.userRole === 'admin') {
-            elements.adminUsersLinkItem.classList.remove('hidden');
-        } else {
-            elements.adminUsersLinkItem.classList.add('hidden');
-        }
-
         // Controla a visibilidade do formulário "Adicionar ao Grupo" na página de usuários
         if (state.userRole === 'admin' || state.userRole === 'user') {
             elements.addUserForm.classList.remove('hidden');
@@ -884,54 +879,6 @@ elements.consentLgpdCheckbox.addEventListener('change', (e) => {
     } else {
         e.target.setCustomValidity('Você deve concordar com os termos da LGPD.');
     }
-});
-
-// Event listeners para o formulário de categorias
-const handleCategoryFormSubmit = async (e) => {
-    e.preventDefault();
-    const name = elements.categoryNameInput.value;
-    const isIncome = elements.categoryTypeIncomeCheckbox.checked;
-    const isExpense = elements.categoryTypeExpenseCheckbox.checked;
-
-    let type = '';
-    if (isIncome && isExpense) {
-        type = 'both';
-    } else if (isIncome) {
-        type = 'income';
-    } else if (isExpense) {
-        type = 'expense';
-    } else {
-        alert('Por favor, selecione pelo menos um tipo (Entrada ou Saída) para a categoria.');
-        return;
-    }
-
-    if (!name) {
-        alert('Por favor, preencha o nome da categoria.');
-        return;
-    }
-
-    try {
-        const success = await api.createCategory(name, type);
-        if (success) {
-            alert('Categoria adicionada com sucesso!');
-            elements.categoryNameInput.value = '';
-            elements.categoryTypeIncomeCheckbox.checked = false; // Limpa o checkbox
-            elements.categoryTypeExpenseCheckbox.checked = false; // Limpa o checkbox
-            fetchAllData(); // Atualiza a lista de categorias e transações
-        } else {
-            alert('Erro ao adicionar categoria. Tente novamente.');
-        }
-    } catch (error) {
-        console.error('Erro ao adicionar categoria:', error);
-        alert(`Erro ao adicionar categoria: ${error.message || 'Erro desconhecido'}`);
-    }
-};
-
-elements.categoryForm.addEventListener('submit', handleCategoryFormSubmit);
-
-// Event listener para mudança no tipo de transação (Entrada/Saída)
-elements.typeInput.addEventListener('change', (e) => {
-    render.populateCategorySelect(e.target.value);
 });
 
 // Event listeners para transferência
@@ -991,8 +938,8 @@ elements.changePasswordForm.addEventListener('submit', handleChangePasswordSubmi
 console.log('Event listener para changePasswordForm adicionado.', elements.changePasswordForm);
 
 // Event listeners para validação de senha do modal de alteração de senha
-if (elements.newPasswordInput) {
-    elements.newPasswordInput.addEventListener('input', (e) => {
+if (elements.changePasswordNewPasswordInput) { // Atualizado
+    elements.changePasswordNewPasswordInput.addEventListener('input', (e) => { // Atualizado
         const password = e.target.value;
         const strength = getPasswordStrength(password);
         if (elements.newPasswordStrength) elements.newPasswordStrength.innerHTML = getPasswordStrengthHTML(strength);
@@ -1003,15 +950,15 @@ if (elements.newPasswordInput) {
             e.target.setCustomValidity('');
         }
         // Dispara o evento input no campo de confirmação para revalidar a correspondência
-        if (elements.confirmNewPasswordInput) {
-            elements.confirmNewPasswordInput.dispatchEvent(new Event('input'));
+        if (elements.changePasswordConfirmNewPasswordInput) { // Atualizado
+            elements.changePasswordConfirmNewPasswordInput.dispatchEvent(new Event('input')); // Atualizado
         }
     });
 }
 
-if (elements.confirmNewPasswordInput && elements.newPasswordInput) {
-    elements.confirmNewPasswordInput.addEventListener('input', (e) => {
-        if (elements.newPasswordInput.value !== e.target.value) {
+if (elements.changePasswordConfirmNewPasswordInput && elements.changePasswordNewPasswordInput) { // Atualizado
+    elements.changePasswordConfirmNewPasswordInput.addEventListener('input', (e) => { // Atualizado
+        if (elements.changePasswordNewPasswordInput.value !== e.target.value) { // Atualizado
             e.target.setCustomValidity('As senhas não coincidem.');
         } else {
             e.target.setCustomValidity('');
@@ -1041,17 +988,18 @@ document.addEventListener('click', (e) => {
 window.addEventListener('popstate', handlePopState);
 
 // Eventos das transações
-elements.transactionList.addEventListener('click', (e) => {
-    if (e.target.closest('.edit-button')) {
-        const id = e.target.closest('.edit-button').dataset.id;
+elements.transactionTableBody.addEventListener('click', (e) => {
+    const target = e.target.closest('button'); // Busca o botão clicado
+    if (!target) return;
+
+    const id = target.dataset.id;
+    if (!id) return;
+
+    if (target.classList.contains('edit-button')) {
         editTransaction(id);
-    }
-    if (e.target.closest('.delete-button')) {
-        const id = e.target.closest('.delete-button').dataset.id;
+    } else if (target.classList.contains('delete-button')) {
         deleteTransaction(id);
-    }
-    if (e.target.closest('.confirm-button')) {
-        const id = e.target.closest('.confirm-button').dataset.id;
+    } else if (target.classList.contains('confirm-button')) {
         confirmTransaction(id);
     }
 });
@@ -1067,7 +1015,6 @@ elements.accountsList.addEventListener('click', (e) => {
 
 // Eventos do calendário
 elements.transactionDateInput.addEventListener('change', () => {
-    // Quando o input type="date" (oculto) muda, atualiza o campo de exibição
     elements.transactionDateDisplayInput.value = formatDateForDisplay(elements.transactionDateInput.value);
 });
 
@@ -1075,44 +1022,69 @@ elements.calendarIconBtn.addEventListener('click', () => {
     elements.transactionDateInput.showPicker();
 });
 
-// Event listener para permitir digitar a data diretamente
-elements.transactionDateDisplayInput.addEventListener('input', (e) => {
-    const inputDate = e.target.value;
-    const formattedDateForInput = parseAndFormatDate(inputDate);
-    if (formattedDateForInput) {
-        elements.transactionDateInput.value = formattedDateForInput;
-        elements.transactionDateDisplayInput.setCustomValidity('');
-    } else {
-        elements.transactionDateInput.value = ''; // Limpa o campo oculto se a data for inválida
-        elements.transactionDateDisplayInput.setCustomValidity('Formato de data inválido. Use DD/MM/AAAA.');
-    }
-});
-
 // Event listener para o modal de alteração de senha, para resetar o formulário ao fechar
 if (elements.changePasswordModal) {
     elements.changePasswordModal.addEventListener('hidden.bs.modal', render.resetChangePasswordForm);
 }
 
-// Carrega a versão do aplicativo do package.json e exibe no footer
-console.log('Tentando carregar package.json para a versão...');
-fetch('../package.json')
-    .then(response => {
-        console.log('Resposta do fetch para package.json:', response);
-        if (!response.ok) {
-            throw new Error(`Erro HTTP! status: ${response.status}`);
-        }
-        return response.json();
-    })
-    .then(data => {
-        console.log('Dados do package.json carregados:', data);
-        const appVersionElement = document.getElementById('app-version');
-        console.log('Elemento app-version encontrado:', appVersionElement);
-        if (appVersionElement) {
-            appVersionElement.textContent = data.version;
-            console.log('Versão definida no rodapé:', data.version);
-        }
-    })
-    .catch(error => console.error('Erro ao carregar a versão do aplicativo:', error));
+// Função para coletar os valores dos filtros de transação
+const collectTransactionFilters = () => {
+    const filters = {};
+
+    // Intervalo de Data
+    const dateType = document.querySelector('input[name="filter-date-type"]:checked')?.value;
+    if (dateType) {
+        filters.dateType = dateType;
+        filters.dateStart = elements.filterDateRangeStart.value;
+        filters.dateEnd = elements.filterDateRangeEnd.value;
+    }
+
+    // Tipo de Transação (Receita/Despesa)
+    const types = [];
+    if (elements.filterTypeIncome.checked) {
+        types.push('income');
+    }
+    if (elements.filterTypeExpense.checked) {
+        types.push('expense');
+    }
+    if (types.length > 0) {
+        filters.types = types.join(',');
+    }
+
+    // Conta Bancária
+
+    // Status de Confirmação
+    if (elements.filterConfirmedSelect.value !== '') {
+        filters.isConfirmed = elements.filterConfirmedSelect.value;
+    }
+
+    console.log('Filtros coletados:', filters);
+    return filters;
+};
+
+// Event listener para o formulário de filtros
+elements.transactionFiltersForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    // Ao aplicar filtros, a função fetchAllData será chamada com os filtros atuais
+    await fetchAllData();
+});
+
+// Event listener para o botão Limpar Filtros
+elements.clearFiltersButton.addEventListener('click', async () => {
+    // Reseta os campos de data
+    elements.filterDateRangeStart.value = '';
+    elements.filterDateRangeEnd.value = '';
+    // Reseta o tipo de data para 'Lançamento' (padrão)
+    elements.filterDateTypeCreated.checked = true; 
+    // Reseta os tipos de transação para ambos marcados (padrão)
+    elements.filterTypeIncome.checked = true;
+    elements.filterTypeExpense.checked = true;
+    // Reseta o status de confirmação para 'Todos' (padrão)
+    elements.filterConfirmedSelect.value = '';
+
+    // Recarrega todos os dados sem filtros
+    await fetchAllData();
+});
 
 // Inicialização
 init();

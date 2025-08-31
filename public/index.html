@@ -145,12 +145,6 @@
                         <span class="nav-text">Usuários</span>
                     </a>
                 </li>
-                <li class="nav-item hidden" id="admin-users-link-item">
-                    <a class="nav-link" href="#admin-users" data-page="admin-users">
-                        <i class="fas fa-user-shield me-2"></i>
-                        <span class="nav-text">Gerenciar Usuários</span>
-                    </a>
-                </li>
                 <li class="nav-item">
                     <a class="nav-link" href="#change-password" data-bs-toggle="modal" data-bs-target="#changePasswordModal">
                         <i class="fas fa-key me-2"></i>
@@ -238,73 +232,24 @@
 
                 <!-- Contas Bancárias -->
                 <div id="contas-page" class="page-content hidden">
-                    <div class="container mt-4">
-                        <h2 class="mb-4">Gerenciar Contas Bancárias</h2>
-
-                        <!-- Formulário para Adicionar Nova Conta -->
-                        <div class="row mb-4">
-                            <div class="col-md-6">
-                                <div class="card shadow-sm h-100">
-                                    <div class="card-header bg-primary text-white">Adicionar Nova Conta</div>
-                                    <div class="card-body">
-                                        <form id="account-form">
-                                            <div class="mb-3">
-                                                <label for="account-name" class="form-label">Nome da Conta</label>
-                                                <input type="text" class="form-control" id="account-name" placeholder="Ex: Conta Corrente, Poupança" required>
-                                            </div>
-                                            <button type="submit" class="btn btn-primary"><i class="fas fa-plus-circle"></i> Adicionar Conta</button>
-                                        </form>
+                    <div class="row">
+                        <div class="col-md-6 mb-4">
+                            <div class="card p-3 shadow-sm">
+                                <form id="account-form">
+                                    <h2 class="text-primary">Adicionar Conta</h2>
+                                    <div class="mb-3">
+                                        <label for="account-name" class="form-label">Nome da Conta:</label>
+                                        <input type="text" class="form-control" id="account-name" required>
                                     </div>
-                                </div>
+                                    <button type="submit" class="btn btn-primary w-100">Adicionar Conta</button>
+                                </form>
                             </div>
-                            <div class="col-md-6">
-                                <!-- Lista de Contas Existentes -->
-                                <div class="card shadow-sm h-100">
-                                    <div class="card-header bg-info text-white">Contas Existentes</div>
-                                    <ul id="accounts-list" class="list-group list-group-flush">
-                                        <!-- Contas serão carregadas aqui -->
-                                    </ul>
-                                </div>
-                            </div>
+                            
                         </div>
-
-                        <h2 class="mb-4">Gerenciar Categorias</h2>
-
-                        <!-- Formulário e Lista de Categorias -->
-                        <div class="row mb-4">
-                            <div class="col-md-6">
-                                <div class="card shadow-sm h-100">
-                                    <div class="card-header bg-primary text-white">Adicionar Nova Categoria</div>
-                                    <div class="card-body">
-                                        <form id="category-form">
-                                            <div class="mb-3">
-                                                <label for="category-name" class="form-label">Nome da Categoria</label>
-                                                <input type="text" class="form-control" id="category-name" placeholder="Ex: Salário, Aluguel, Alimentação" required>
-                                            </div>
-                                            <div class="mb-3">
-                                                <label class="form-label">Tipo</label><br>
-                                                <div class="form-check form-check-inline">
-                                                    <input class="form-check-input" type="checkbox" id="category-type-income" value="income">
-                                                    <label class="form-check-label" for="category-type-income">Entrada</label>
-                                                </div>
-                                                <div class="form-check form-check-inline">
-                                                    <input class="form-check-input" type="checkbox" id="category-type-expense" value="expense">
-                                                    <label class="form-check-label" for="category-type-expense">Saída</label>
-                                                </div>
-                                            </div>
-                                            <button type="submit" class="btn btn-primary"><i class="fas fa-plus-circle"></i> Adicionar Categoria</button>
-                                        </form>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <!-- Lista de Categorias Existentes -->
-                                <div class="card shadow-sm h-100">
-                                    <div class="card-header bg-info text-white">Categorias Existentes</div>
-                                    <ul id="categories-list" class="list-group list-group-flush">
-                                        <!-- Categorias serão carregadas aqui -->
-                                    </ul>
-                                </div>
+                        <div class="col-md-6 mb-4">
+                            <div class="card p-3 shadow-sm">
+                                <h2 class="text-primary">Lista de Contas</h2>
+                                <ul id="accounts-list" class="list-group list-group-flush"></ul>
                             </div>
                         </div>
                     </div>
@@ -312,76 +257,154 @@
 
                 <!-- Transações -->
                 <div id="transacoes-page" class="page-content hidden">
-                    <div class="container mt-4">
-                        <h2 id="form-title" class="mb-4 text-center">Adicionar Transação</h2>
-                        <div class="row justify-content-center mb-4">
-                            <div class="col-lg-8">
-                                <div class="card shadow-sm">
-                                    <div class="card-body">
-                                        <form id="transaction-form">
-                                            <input type="hidden" id="transaction-id">
-                                            <div class="mb-3">
-                                                <label for="description" class="form-label">Descrição</label>
-                                                <input type="text" class="form-control" id="description" placeholder="Ex: Salário, Aluguel, Compras" required>
+                    <!-- Seção Adicionar Transação (agora no topo) -->
+                    <div class="row">
+                        <div class="col-12 mb-4">
+                            <div class="card p-3 shadow-sm">
+                                <form id="transaction-form">
+                                    <h2 id="form-title" class="text-primary">Adicionar Transação</h2>
+                                    <input type="hidden" id="transaction-id">
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label for="account-select" class="form-label">Conta:</label>
+                                            <select class="form-select" id="account-select" required></select>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="type" class="form-label">Tipo:</label>
+                                            <select class="form-select" id="type" required>
+                                                <option value="income">Receita</option>
+                                                <option value="expense">Despesa</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-12">
+                                            <label for="description" class="form-label">Descrição:</label>
+                                            <input type="text" class="form-control" id="description" required>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="amount" class="form-label">Valor:</label>
+                                            <div class="input-group">
+                                                <span class="input-group-text">R$</span>
+                                                <input type="number" class="form-control" id="amount" step="0.01" required>
                                             </div>
-                                            
-                            <!-- Grupo: Valor, Data e Parcelas -->
-                            <div class="row mb-3">
-                                <div class="col-md-4">
-                                    <label for="amount" class="form-label">Valor</label>
-                                    <input type="number" step="0.01" class="form-control" id="amount" placeholder="Ex: 1500.00" required>
-                                </div>
-                                <div class="col-md-4">
-                                    <label for="transaction-date-display" class="form-label">Data de Vencimento/Ocorrência</label>
-                                    <div class="input-group">
-                                        <input type="text" class="form-control" id="transaction-date-display" placeholder="DD/MM/AAAA">
-                                        <button class="btn btn-outline-secondary calendar-icon-btn" type="button" id="button-addon2">
-                                            <i class="far fa-calendar-alt"></i>
-                                        </button>
-                                        <input type="date" class="form-control hidden" id="transaction-date">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="transaction-date" class="form-label">Data da Transação:</label>
+                                            <div class="input-group">
+                                                <span class="input-group-text calendar-icon-btn"><i class="fas fa-calendar-alt"></i></span>
+                                                <input type="date" class="form-control d-none" id="transaction-date" required>
+                                                <input type="text" class="form-control" id="transaction-date-display" readonly>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="multiplier-input" class="form-label">Multiplicador:</label>
+                                            <input type="number" class="form-control" id="multiplier-input" value="1" min="1">
+                                        </div>
+                                        <div class="col-12">
+                                            <button type="submit" id="submit-button" class="btn btn-primary w-100">Adicionar</button>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Seção Filtros de Transações -->
+                    <div class="row">
+                        <div class="col-12 mb-4">
+                            <div class="card p-3 shadow-sm">
+                                <h2 class="text-primary">Filtros de Transações</h2>
+                                <form id="transaction-filters-form" class="mb-4">
+                                    <div class="row g-3">
+                                        <!-- Agrupamento de Filtros de Data e Tipo de Data -->
+                                        <div class="col-md-6">
+                                            <label for="filter-date-range-start" class="form-label">Período:</label>
+                                            <div class="input-group">
+                                                <input type="date" class="form-control" id="filter-date-range-start">
+                                                <span class="input-group-text">até</span>
+                                                <input type="date" class="form-control" id="filter-date-range-end">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label d-block">Tipo de Período:</label>
+                                            <div class="d-flex flex-wrap">
+                                                <div class="form-check form-check-inline me-3">
+                                                    <input class="form-check-input" type="radio" name="filter-date-type" id="filter-date-type-created" value="created_at" checked>
+                                                    <label class="form-check-label" for="filter-date-type-created">Lançamento</label>
+                                                </div>
+                                                <div class="form-check form-check-inline me-3">
+                                                    <input class="form-check-input" type="radio" name="filter-date-type" id="filter-date-type-due" value="due_date">
+                                                    <label class="form-check-label" for="filter-date-type-due">Vencimento</label>
+                                                </div>
+                                                <div class="form-check form-check-inline">
+                                                    <input class="form-check-input" type="radio" name="filter-date-type" id="filter-date-type-confirmed" value="confirmed_at">
+                                                    <label class="form-check-label" for="filter-date-type-confirmed">Confirmação</label>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Checkboxes para Tipo de Transação e Seletor de Status -->
+                                        <div class="col-md-6">
+                                            <label class="form-label d-block">Tipo de Transação:</label>
+                                            <div class="d-flex flex-wrap">
+                                                <div class="form-check form-check-inline me-3">
+                                                    <input class="form-check-input" type="checkbox" id="filter-type-income" value="income" checked>
+                                                    <label class="form-check-label" for="filter-type-income">Receita</label>
+                                                </div>
+                                                <div class="form-check form-check-inline">
+                                                    <input class="form-check-input" type="checkbox" id="filter-type-expense" value="expense" checked>
+                                                    <label class="form-check-label" for="filter-type-expense">Despesa</label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="filter-confirmed" class="form-label">Status:</label>
+                                            <select class="form-select" id="filter-confirmed">
+                                                <option value="">Todos</option>
+                                                <option value="1">Confirmada</option>
+                                                <option value="0">Não Confirmada</option>
+                                            </select>
+                                        </div>
+
+                                        <!-- Botões de Ação -->
+                                        <div class="col-12 d-flex justify-content-end mt-4">
+                                            <button type="button" id="clear-filters-button" class="btn btn-secondary me-2"><i class="fas fa-times me-2"></i>Limpar Filtros</button>
+                                            <button type="submit" id="apply-filters-button" class="btn btn-primary"><i class="fas fa-filter me-2"></i>Aplicar Filtros</button>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Seção Histórico de Transações (a tabela) -->
+                    <div class="row">
+                        <div class="col-12 mb-4">
+                            <div class="card p-3 shadow-sm">
+                                <h2 class="text-primary">Histórico de Transações</h2>
+                                <div class="scrollable-list-container">
+                                    <div class="table-responsive">
+                                        <table class="table table-hover table-sm table-striped align-middle">
+                                            <thead class="table-light">
+                                                 <tr>
+                                                     <th>Descrição</th>
+                                                     <th style="width: 100px;">Valor</th>
+                                                     <th style="width: 80px;">Tipo</th>
+                                                     <th style="width: 120px;">Conta</th>
+                                                     <th style="width: 120px;">Lançamento</th>
+                                                     <th style="width: 120px;">Vencimento</th>
+                                                     <th style="width: 120px;">Confirmação</th>
+                                                     <th style="width: 120px;">Criado Por</th>
+                                                     <th style="width: 100px;">Ações</th>
+                                                 </tr>
+                                            </thead>
+                                            <tbody id="transaction-table-body">
+                                                 <!-- Transações serão inseridas via JavaScript -->
+                                            </tbody>
+                                        </table>
                                     </div>
                                 </div>
-                                <div class="col-md-4">
-                                    <label for="num-parcels" class="form-label">Parcelas (> 1 para replicar)</label>
-                                    <input type="number" class="form-control" id="num-parcels" value="1" min="1">
-                                </div>
                             </div>
-
-                            <!-- Grupo: Tipo e Conta -->
-                            <div class="row mb-3">
-                                <div class="col-md-6">
-                                    <label for="type" class="form-label">Tipo</label>
-                                    <select class="form-select" id="type" required>
-                                        <option value="income">Entrada</option>
-                                        <option value="expense">Saída</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-6">
-                                    <label for="account-select" class="form-label">Conta</label>
-                                    <select class="form-select" id="account-select" required>
-                                        <!-- Opções de contas serão carregadas aqui -->
-                                    </select>
-                                </div>
-                            </div>
-
-                            <!-- Nova seleção de categoria -->
-                            <div class="mb-3">
-                                <label for="category-select" class="form-label">Categoria</label>
-                                <select class="form-select" id="category-select" required>
-                                    <option value="">Selecione a Categoria</option>
-                                    <!-- Opções de categorias serão carregadas aqui -->
-                                </select>
-                            </div>
-
-                            <button type="submit" class="btn btn-primary w-100" id="submit-button"><i class="fas fa-plus-circle"></i> Adicionar</button>
-                        </form>
-                    </div>
-                </div>
-
-                        <h2 class="mb-4">Histórico de Transações</h2>
-                        <ul id="transaction-list" class="list-group mb-4">
-                            <!-- Transações serão carregadas aqui -->
-                        </ul>
+                        </div>
                     </div>
                 </div>
 
@@ -467,6 +490,7 @@
                         <div class="col-12 mb-4">
                             <div class="card p-3 shadow-sm">
                                 <h2 class="text-primary">Gerenciar Usuários do Sistema</h2>
+                                
                                 <div class="table-responsive">
                                     <table class="table table-hover">
                                         <thead class="table-light">
@@ -497,12 +521,6 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script type="module" src="js/main.js"></script>
-
-    <footer class="footer mt-auto py-3 bg-light">
-        <div class="container text-center">
-            <span class="text-muted">Controle Financeiro Pessoal - Versão <span id="app-version"></span></span>
-        </div>
-    </footer>
 </body>
 </html>
 
@@ -586,5 +604,4 @@
             </div>
         </div>
     </div>
-</div>
 </div>

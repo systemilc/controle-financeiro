@@ -32,7 +32,6 @@ export const elements = {
     mainContent: document.getElementById('main-content'),
     pageTitle: document.getElementById('page-title'),
     currentUser: document.getElementById('current-user'),
-    adminUsersLinkItem: document.getElementById('admin-users-link-item'), // Novo elemento para o link Gerenciar Usuários
     
     // Páginas
     dashboardPage: document.getElementById('dashboard-page'),
@@ -78,13 +77,26 @@ export const elements = {
     formTitle: document.getElementById('form-title'),
     submitButton: document.getElementById('submit-button'),
     transactionForm: document.getElementById('transaction-form'),
-    transactionList: document.getElementById('transaction-list'),
+    transactionTableBody: document.getElementById('transaction-table-body'),
     calendarIconBtn: document.querySelector('.calendar-icon-btn'),
-    numParcelsInput: document.getElementById('num-parcels'), // Novo elemento
+    multiplierInput: document.getElementById('multiplier-input'), // Novo campo multiplicador
     
+    // Filtros de Transações
+    transactionFiltersForm: document.getElementById('transaction-filters-form'),
+    filterDateRangeStart: document.getElementById('filter-date-range-start'),
+    filterDateRangeEnd: document.getElementById('filter-date-range-end'),
+    filterDateTypeCreated: document.getElementById('filter-date-type-created'),
+    filterDateTypeDue: document.getElementById('filter-date-type-due'),
+    filterDateTypeConfirmed: document.getElementById('filter-date-type-confirmed'),
+    filterTypeIncome: document.getElementById('filter-type-income'),
+    filterTypeExpense: document.getElementById('filter-type-expense'),
+    filterConfirmedSelect: document.getElementById('filter-confirmed'),
+    applyFiltersButton: document.getElementById('apply-filters-button'),
+    clearFiltersButton: document.getElementById('clear-filters-button'), // Novo botão
+
     // Usuários
     newUsernameInput: document.getElementById('new-username'),
-    newPasswordInput: document.getElementById('new-password'),
+    addUserNotificationPasswordInput: document.getElementById('new-password'), // Renomeado
     newWhatsappInput: document.getElementById('new-whatsapp'),
     newInstagramInput: document.getElementById('new-instagram'),
     newEmailInput: document.getElementById('new-email'),
@@ -112,20 +124,12 @@ export const elements = {
     editGroupIdInput: document.getElementById('edit-group-id'),
     editUserErrorMessage: document.getElementById('edit-user-error-message'),
 
-    // Gerenciar Categorias
-    categoryNameInput: document.getElementById('category-name'),
-    categoryTypeIncomeCheckbox: document.getElementById('category-type-income'), // Novo
-    categoryTypeExpenseCheckbox: document.getElementById('category-type-expense'), // Novo
-    categoryForm: document.getElementById('category-form'),
-    categoriesList: document.getElementById('categories-list'),
-    categorySelect: document.getElementById('category-select'), // Select de categoria no formulário de transações
-
     // Alterar Senha (Modal)
     changePasswordModal: document.getElementById('changePasswordModal'),
     changePasswordForm: document.getElementById('change-password-form'),
     currentPasswordInput: document.getElementById('current-password'),
-    newPasswordInput: document.getElementById('change-new-password'), // ID atualizado
-    confirmNewPasswordInput: document.getElementById('confirm-new-password'),
+    changePasswordNewPasswordInput: document.getElementById('change-new-password'), // ID atualizado e renomeado
+    changePasswordConfirmNewPasswordInput: document.getElementById('confirm-new-password'), // Renomeado
     changePasswordErrorMessage: document.getElementById('change-password-error-message'),
     newPasswordStrength: document.getElementById('new-password-strength'),
 };
@@ -288,8 +292,11 @@ export const render = {
     },
     
     showLoginScreen: () => {
+        elements.registerScreen.classList.add('hidden');
         elements.mainApp.classList.add('hidden');
         elements.loginScreen.classList.remove('hidden');
+        elements.errorMessage.classList.add('hidden'); // Esconde erro anterior
+        render.resetForm(); // Reset do formulário de login
     },
     
     showLoginError: (message) => {
@@ -307,14 +314,6 @@ export const render = {
         elements.registerScreen.classList.remove('hidden');
         elements.registerErrorMessage.classList.add('hidden'); // Esconde erro anterior
         render.resetRegistrationForm();
-    },
-
-    showLoginScreen: () => {
-        elements.registerScreen.classList.add('hidden');
-        elements.mainApp.classList.add('hidden');
-        elements.loginScreen.classList.remove('hidden');
-        elements.errorMessage.classList.add('hidden'); // Esconde erro anterior
-        render.resetForm(); // Reset do formulário de login
     },
     
     // Dashboard
@@ -358,10 +357,19 @@ export const render = {
                 // Só considera transações confirmadas
                 if (transaction.is_confirmed) {
                     const amount = parseFloat(transaction.amount) || 0;
-                    console.log(`Transação confirmada: ${transaction.description}, Tipo: ${transaction.type}, Valor: ${amount}`);
+                    console.log(`Transação confirmada: ${transaction.description}, Tipo: ${transaction.type}, Valor: ${amount}, É Transferência: ${transaction.is_transfer}`);
                     
+                    // Se não for uma transferência, contribui para a receita/despesa total consolidada
+                    if (!transaction.is_transfer) {
+                        if (transaction.type === 'income') {
+                            totalIncome += amount;
+                        } else if (transaction.type === 'expense') {
+                            totalExpense += amount;
+                        }
+                    }
+
+                    // Sempre afeta o saldo da conta individual
                     if (transaction.type === 'income') {
-                        totalIncome += amount;
                         if (accountBalances[transaction.account_id]) {
                             accountBalances[transaction.account_id].income += amount;
                             console.log(`Receita adicionada à conta ${transaction.account_id}: +${amount}`);
@@ -369,7 +377,6 @@ export const render = {
                             console.log(`AVISO: Conta ${transaction.account_id} não encontrada para receita`);
                         }
                     } else if (transaction.type === 'expense') {
-                        totalExpense += amount;
                         if (accountBalances[transaction.account_id]) {
                             accountBalances[transaction.account_id].expense += amount;
                             console.log(`Despesa adicionada à conta ${transaction.account_id}: +${amount}`);
@@ -443,44 +450,6 @@ export const render = {
             elements.accountsList.appendChild(li);
         });
     },
-
-    // Categorias
-    renderCategoriesList: (categories) => {
-        elements.categoriesList.innerHTML = '';
-        if (!categories || categories.length === 0) {
-            elements.categoriesList.innerHTML = '<li class="list-group-item text-center">Nenhuma categoria encontrada.</li>';
-            return;
-        }
-        categories.forEach(category => {
-            const li = document.createElement('li');
-            li.className = 'list-group-item d-flex justify-content-between align-items-center';
-            li.innerHTML = `
-                <span>${category.name}</span>
-                <div>
-                    <button class="btn btn-danger btn-sm delete-category-button" data-id="${category.id}" data-name="${category.name}">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-            `;
-            elements.categoriesList.appendChild(li);
-        });
-    },
-
-    populateCategorySelect: (transactionType) => {
-        const selectElement = elements.categorySelect;
-        selectElement.innerHTML = '<option value="">Selecione a Categoria</option>';
-
-        const filteredCategories = state.allCategories.filter(cat => 
-            cat.type === 'both' || cat.type === transactionType
-        );
-
-        filteredCategories.forEach(category => {
-            const option = document.createElement('option');
-            option.value = category.id;
-            option.textContent = category.name; // Apenas o nome da categoria
-            selectElement.appendChild(option);
-        });
-    },
     
     // Funções de transferência
     populateTransferSelects: () => {
@@ -527,51 +496,48 @@ export const render = {
     
     // Transações
     transactions: (transactions) => {
-        elements.transactionList.innerHTML = '';
+        elements.transactionTableBody.innerHTML = '';
         
+        if (!transactions || transactions.length === 0) {
+            const noTransactionsRow = document.createElement('tr');
+            noTransactionsRow.innerHTML = '<td colspan="9" class="text-center text-muted py-4">Nenhuma transação encontrada para os filtros aplicados.</td>';
+            elements.transactionTableBody.appendChild(noTransactionsRow);
+            return;
+        }
+
         transactions.forEach(transaction => {
-            const li = document.createElement('li');
-            li.className = 'list-group-item transaction-item p-3';
+            const tr = document.createElement('tr');
+            tr.className = 'transaction-row';
+            tr.dataset.id = transaction.id; // Adiciona o ID para facilitar a manipulação de eventos
             
             const accountName = transaction.account_name || transaction.original_account_name || 'Conta não encontrada';
-            const amountClass = transaction.type === 'income' ? 'income' : 'expense';
+            const amountClass = transaction.type === 'income' ? 'text-success' : 'text-danger';
             const amountPrefix = transaction.type === 'income' ? '+' : '-';
-            const confirmButton = transaction.is_confirmed ? 
-                '<span class="badge bg-success">Confirmada</span>' : 
-                // Botão Confirmar como ícone transparente
-                `<a href="#" class="btn-action confirm-button text-success me-2" data-id="${transaction.id}" title="Confirmar"><i class="fas fa-check"></i></a>`;
             
-            li.innerHTML = `
-                <div class="d-flex justify-content-between align-items-start">
-                    <div class="flex-grow-1">
-                        <h6 class="mb-1">${transaction.description}</h6>
-                        <small class="text-muted">
-                            Conta: ${accountName} | 
-                            Criado por: ${transaction.creator_name || 'N/A'} | 
-                            Data: ${transaction.due_date || 'N/A'} | 
-                            Categoria: ${transaction.category_name || 'N/A'}
-                        </small>
-                    </div>
-                    <div class="text-end">
-                        <div class="transaction-amount ${amountClass} mb-2">
-                            ${amountPrefix}R$ ${transaction.amount.toFixed(2).replace('.', ',')}
-                        </div>
-                        <div class="transaction-actions">
-                            ${confirmButton}
-                            <!-- Botão Editar como ícone transparente -->
-                            <a href="#" class="btn-action edit-button text-warning me-2" data-id="${transaction.id}" title="Editar">
-                                <i class="fas fa-pencil-alt"></i>
-                            </a>
-                            <!-- Botão Deletar como ícone transparente -->
-                            <a href="#" class="btn-action delete-button text-danger" data-id="${transaction.id}" title="Deletar">
-                                <i class="fas fa-times"></i>
-                            </a>
-                        </div>
-                    </div>
-                </div>
+            const confirmButtonHtml = transaction.is_confirmed ? 
+                '<span class="badge bg-success">Confirmada</span>' : 
+                `<button class="btn btn-sm confirm-button table-action-btn" data-id="${transaction.id}" title="Confirmar"><i class="fas fa-check"></i></button>`;
+            
+            const editButtonHtml = `<button class="btn btn-sm edit-button table-action-btn" data-id="${transaction.id}" title="Editar"><i class="fas fa-pencil-alt"></i></button>`;
+            const deleteButtonHtml = `<button class="btn btn-sm delete-button table-action-btn" data-id="${transaction.id}" title="Deletar"><i class="fas fa-times"></i></button>`;
+
+            tr.innerHTML = `
+                <td>${transaction.description}</td>
+                <td class="${amountClass} text-end">${amountPrefix}R$ ${parseFloat(transaction.amount).toFixed(2).replace('.', ',')}</td>
+                <td>${transaction.type === 'income' ? 'Receita' : 'Despesa'}</td>
+                <td>${accountName}</td>
+                <td>${formatDateForDisplay(transaction.created_at)}</td>
+                <td>${transaction.due_date ? formatDateForDisplay(transaction.due_date) : 'N/A'}</td>
+                <td>${transaction.is_confirmed && transaction.confirmed_at ? formatDateForDisplay(transaction.confirmed_at) : 'Não Confirmada'}</td>
+                <td>${transaction.creator_name || 'N/A'}</td>
+                <td class="text-nowrap">
+                    ${confirmButtonHtml}
+                    ${editButtonHtml}
+                    ${deleteButtonHtml}
+                </td>
             `;
             
-            elements.transactionList.appendChild(li);
+            elements.transactionTableBody.appendChild(tr);
         });
     },
     
@@ -618,21 +584,12 @@ export const render = {
         elements.amountInput.value = '';
         elements.typeInput.value = 'income';
         elements.accountSelect.value = '';
-        elements.categorySelect.value = ''; // Limpa a seleção de categoria
         elements.transactionDateInput.value = '';
         elements.transactionDateDisplayInput.value = '';
         elements.formTitle.textContent = 'Adicionar Transação';
         elements.submitButton.textContent = 'Adicionar';
-        elements.newUsernameInput.value = ''; // Limpa o campo de nome de usuário do formulário de adicionar usuário
-        elements.newPasswordInput.value = ''; // Limpa o campo de senha do formulário de adicionar usuário
-        elements.newWhatsappInput.value = ''; // Limpa o campo de WhatsApp do formulário de adicionar usuário
-        elements.newWhatsappInput.closest('.mb-3').style.display = 'block'; // Garante que o campo WhatsApp esteja visível
-        elements.newInstagramInput.value = ''; // Limpa o campo de Instagram do formulário de adicionar usuário
-        elements.newInstagramInput.closest('.mb-3').style.display = 'block'; // Garante que o campo Instagram esteja visível
-        elements.newEmailInput.value = ''; // Limpa o campo de Email do formulário de adicionar usuário
-        elements.newEmailInput.closest('.mb-3').style.display = 'block'; // Garante que o campo Email esteja visível
-        elements.numParcelsInput.value = 1; // Reseta para 1 parcela
-        elements.numParcelsInput.disabled = false; // Habilita o campo de parcelas
+        elements.multiplierInput.value = 1; // Reseta o multiplicador para 1
+        // As linhas de reset para os campos de adição de usuário foram movidas para serem chamadas apenas após o sucesso do cadastro.
     },
     
     // Reset do formulário de transferência
@@ -720,8 +677,8 @@ export const render = {
        elements.changePasswordForm.reset();
        elements.changePasswordErrorMessage.classList.add('hidden');
        elements.newPasswordStrength.innerHTML = '';
-       elements.newPasswordInput.setCustomValidity('');
-       elements.confirmNewPasswordInput.setCustomValidity('');
+       elements.changePasswordNewPasswordInput.setCustomValidity(''); // Atualizado para o novo nome
+       elements.changePasswordConfirmNewPasswordInput.setCustomValidity(''); // Atualizado para o novo nome
    },
 
    // Exibe erro no formulário de alteração de senha

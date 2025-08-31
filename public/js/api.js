@@ -45,8 +45,10 @@ export const api = {
         return response;
     },
     
-    fetchTransactions: async () => {
-        const response = await fetch('/api/transactions', { headers: headers() });
+    fetchTransactions: async (filters = {}) => {
+        const queryString = new URLSearchParams(filters).toString();
+        const url = `/api/transactions${queryString ? `?${queryString}` : ''}`;
+        const response = await fetch(url, { headers: headers() });
         return await response.json();
     },
 
@@ -86,30 +88,6 @@ export const api = {
     
     fetchSingleTransaction: async (id) => {
         const response = await fetch(`/api/transactions/${id}`, { headers: headers() });
-        return await response.json();
-    },
-
-    // Métodos para Categorias
-    createCategory: async (name, type) => {
-        const response = await fetch('/api/categories', {
-            method: 'POST',
-            headers: headers(),
-            body: JSON.stringify({ name, type }),
-        });
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || 'Erro ao criar categoria');
-        }
-        return response.ok;
-    },
-
-    fetchCategories: async (type = '') => {
-        const url = type ? `/api/categories?type=${type}` : '/api/categories';
-        const response = await fetch(url, { headers: headers() });
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || 'Erro ao buscar categorias');
-        }
         return await response.json();
     },
 

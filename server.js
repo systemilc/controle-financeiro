@@ -27,21 +27,7 @@ db.serialize(() => {
             username TEXT UNIQUE,
             password TEXT,
             group_id INTEGER,
-            role TEXT DEFAULT 'user',
-            whatsapp TEXT,
-            instagram TEXT,
-            email TEXT UNIQUE,
-            consent_lgpd INTEGER DEFAULT 0
-        )
-    `);
-
-    db.run(`
-        CREATE TABLE IF NOT EXISTS categories (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            type TEXT NOT NULL, -- 'income', 'expense', 'both'
-            group_id INTEGER NOT NULL,
-            FOREIGN KEY(group_id) REFERENCES users(group_id)
+            role TEXT DEFAULT 'user'
         )
     `);
 
@@ -78,7 +64,6 @@ db.serialize(() => {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER,
             account_id INTEGER,
-            category_id INTEGER, -- Nova coluna para categoria
             description TEXT,
             amount REAL,
             type TEXT,
@@ -87,9 +72,9 @@ db.serialize(() => {
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             due_date TEXT,
             confirmed_at TEXT DEFAULT NULL,
+            is_transfer INTEGER DEFAULT 0, -- Nova coluna
             FOREIGN KEY(user_id) REFERENCES users(id),
-            FOREIGN KEY(account_id) REFERENCES accounts(id),
-            FOREIGN KEY(category_id) REFERENCES categories(id)
+            FOREIGN KEY(account_id) REFERENCES accounts(id)
         )
     `);
 
@@ -117,17 +102,11 @@ db.serialize(() => {
     });
     
     // Altera a tabela de transações para adicionar as colunas se elas não existirem
-    const transactionColumns = ['original_account_name', 'is_confirmed', 'created_at', 'due_date', 'confirmed_at', 'category_id']; // Adiciona category_id aqui
+    const transactionColumns = ['original_account_name', 'is_confirmed', 'created_at', 'due_date', 'confirmed_at'];
     transactionColumns.forEach(col => {
         db.all(`PRAGMA table_info(transactions)`, (err, tableInfo) => {
             if (!tableInfo || !Array.isArray(tableInfo) || !tableInfo.some(c => c.name === col)) {
-                let columnType = 'INTEGER'; // Tipo padrão para category_id
-                if (col === 'original_account_name' || col === 'created_at' || col === 'due_date' || col === 'confirmed_at') {
-                    columnType = 'TEXT';
-                } else if (col === 'is_confirmed') {
-                    columnType = 'INTEGER DEFAULT 0';
-                }
-                db.run(`ALTER TABLE transactions ADD COLUMN ${col} ${columnType}`, (err) => {
+                db.run(`ALTER TABLE transactions ADD COLUMN ${col} TEXT`, (err) => {
                     if (err) {
                         console.error(`Erro ao adicionar a coluna ${col} em transactions:`, err.message);
                     }
@@ -189,46 +168,6 @@ const authorizeRole = (requiredRole) => (req, res, next) => {
 };
 
 // --- ROTAS DA API ---
-
-// Rotas de Categoria
-app.post('/api/categories', authenticate, (req, res) => {
-    const { name, type } = req.body;
-    const groupId = req.groupId;
-
-    if (!name || !type) {
-        return res.status(400).json({ message: 'Nome e tipo da categoria são obrigatórios.' });
-    }
-
-    if (!['income', 'expense', 'both'].includes(type)) {
-        return res.status(400).json({ message: 'Tipo de categoria inválido. Use \'income\', \'expense\' ou \'both\'.' });
-    }
-
-    db.run(`INSERT INTO categories (name, type, group_id) VALUES (?, ?, ?)`, [name, type, groupId], function(err) {
-        if (err) {
-            return res.status(500).json({ message: 'Erro ao criar categoria', error: err.message });
-        }
-        res.status(201).json({ id: this.lastID, name, type, group_id: groupId });
-    });
-});
-
-app.get('/api/categories', authenticate, (req, res) => {
-    const groupId = req.groupId;
-    const { type } = req.query; // Pode filtrar por tipo
-    let query = `SELECT * FROM categories WHERE group_id = ?`;
-    const params = [groupId];
-
-    if (type && ['income', 'expense', 'both'].includes(type)) {
-        query += ` AND (type = ? OR type = 'both')`;
-        params.push(type);
-    }
-
-    db.all(query, params, (err, rows) => {
-        if (err) {
-            return res.status(500).json({ message: 'Erro ao buscar categorias', error: err.message });
-        }
-        res.json(rows);
-    });
-});
 
 app.post('/api/register', (req, res) => {
     const { username, password, whatsapp, instagram, email, consent_lgpd } = req.body;
@@ -306,12 +245,20 @@ app.post('/api/login', (req, res) => {
 app.post('/api/users/add', authenticate, (req, res) => {
     const { username, password, whatsapp, instagram, email } = req.body;
     const groupId = req.groupId;
+    const creatorRole = req.userRole; // Papel do usuário logado
+
+    // Define a role padrão para o novo usuário
+    let newRole = 'collaborator'; 
+    if (creatorRole === 'admin') {
+        // Se o criador for admin, ele pode definir a role do novo usuário via payload
+        newRole = req.body.role || 'collaborator';
+    }
 
     bcrypt.hash(password, SALT_ROUNDS, (err, hash) => {
         if (err) {
             return res.status(500).json({ message: 'Erro ao criar usuário', error: err.message });
         }
-        db.run(`INSERT INTO users (username, password, group_id, role, whatsapp, instagram, email) VALUES (?, ?, ?, ?, ?, ?, ?)`, [username, hash, groupId, 'collaborator', whatsapp, instagram, email], (err) => {
+        db.run(`INSERT INTO users (username, password, group_id, role, whatsapp, instagram, email) VALUES (?, ?, ?, ?, ?, ?, ?)`, [username, hash, groupId, newRole, whatsapp, instagram, email], (err) => {
             if (err) {
                 return res.status(400).json({ message: 'Usuário já existe ou erro no banco.', error: err.message });
             }
@@ -329,9 +276,9 @@ app.get('/api/users/list', authenticate, (req, res) => {
 
     if (userRole === 'admin') {
         query = `SELECT id, username, email, whatsapp, instagram, consent_lgpd, role, group_id FROM users`;
-    } else if (userRole === 'user') {
-        // Usuários normais veem apenas seus colaboradores
-        query = `SELECT id, username, email, whatsapp, instagram, consent_lgpd, role, group_id FROM users WHERE group_id = ? AND role = 'collaborator'`;
+    } else if (userRole === 'user' || userRole === 'collaborator') {
+        // Usuários normais e colaboradores veem todos os membros do seu grupo
+        query = `SELECT id, username, email, whatsapp, instagram, consent_lgpd, role, group_id FROM users WHERE group_id = ?`;
         params = [groupId];
     } else {
         return res.status(403).json({ message: 'Acesso negado para este tipo de usuário.' });
@@ -487,18 +434,19 @@ app.delete('/api/accounts/:id', authenticate, (req, res) => {
 });
 
 app.post('/api/transactions', authenticate, (req, res) => {
-    const { description, amount, type, account_id, due_date, category_id } = req.body; // Adiciona category_id
+    const { description, amount, type, account_id, due_date, is_transfer } = req.body;
     const userId = req.userId;
-    if (!account_id || !category_id) { // category_id agora é obrigatório
-        return res.status(400).json({ message: 'O ID da conta e o ID da categoria são obrigatórios.' });
+    if (!account_id) {
+        return res.status(400).json({ message: 'O ID da conta é obrigatório.' });
     }
-    db.run(`INSERT INTO transactions (user_id, account_id, category_id, description, amount, type, due_date) VALUES (?, ?, ?, ?, ?, ?, ?)`, // Adiciona category_id aqui
-        [userId, account_id, category_id, description, amount, type, due_date],
+    db.run(`INSERT INTO transactions (user_id, account_id, description, amount, type, due_date, is_transfer) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [userId, account_id, description, amount, type, due_date, is_transfer ? 1 : 0],
         function (err) {
             if (err) {
+                console.error('Erro ao inserir transação no banco de dados:', err.message); // Adicionado para depuração
                 return res.status(500).json({ message: 'Erro ao adicionar transação', error: err.message });
             }
-            res.status(201).json({ id: this.lastID, description, amount, type, account_id, due_date, category_id, created_at: new Date().toISOString() }); // Retorna category_id
+            res.status(201).json({ id: this.lastID, description, amount, type, account_id, due_date, created_at: new Date().toISOString() });
         }
     );
 });
@@ -511,8 +459,13 @@ app.put('/api/transactions/:id/confirm', authenticate, (req, res) => {
     console.log('Confirmando transação com ID:', id);
     console.log('User ID do header:', userId);
 
-    db.run(`UPDATE transactions SET is_confirmed = 1, confirmed_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?`,
-        [id, userId],
+    db.run(`
+        UPDATE transactions
+        SET is_confirmed = 1, confirmed_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+          AND account_id IN (SELECT id FROM accounts WHERE group_id = ?)
+    `,
+        [id, req.groupId],
         function(err) {
             if (err) {
                 console.error('Erro no banco de dados:', err.message);
@@ -534,15 +487,52 @@ app.get('/api/transactions', authenticate, (req, res) => {
     console.log('--- GET /api/transactions ---');
     console.log('Buscando transações para o Group ID:', groupId);
 
-    db.all(`
-        SELECT t.*, a.name as account_name, u.username as creator_name, c.name as category_name
+    // Extrai os parâmetros de filtro da query string
+    const { dateType, dateStart, dateEnd, types, accountId, isConfirmed } = req.query;
+    console.log('Filtros recebidos no backend:', { dateType, dateStart, dateEnd, types, accountId, isConfirmed });
+
+    let whereClauses = ['a.group_id = ?'];
+    let params = [groupId];
+
+    // Filtro por tipo de data e intervalo
+    if (dateType && dateStart && dateEnd) {
+        // Garante que as datas sejam formatadas como 'YYYY-MM-DD'
+        whereClauses.push(`DATE(t.${dateType}) BETWEEN ? AND ?`);
+        params.push(dateStart);
+        params.push(dateEnd);
+    }
+
+    // Filtro por tipos de transação (income, expense ou ambos)
+    if (types) {
+        const typeArray = types.split(',');
+        if (typeArray.length === 1) {
+            whereClauses.push(`t.type = ?`);
+            params.push(typeArray[0]);
+        } else if (typeArray.length === 2 && typeArray.includes('income') && typeArray.includes('expense')) {
+            // Se ambos forem selecionados, não adiciona filtro por tipo
+        }
+    }
+
+    // Status de Confirmação
+    if (isConfirmed !== undefined && isConfirmed !== '') {
+        whereClauses.push(`t.is_confirmed = ?`);
+        params.push(parseInt(isConfirmed)); // Converte para inteiro
+    }
+
+    let query = `
+        SELECT t.*, a.name as account_name, u.username as creator_name, t.is_transfer
         FROM transactions t
         LEFT JOIN accounts a ON t.account_id = a.id
         LEFT JOIN users u ON t.user_id = u.id
-        LEFT JOIN categories c ON t.category_id = c.id -- JOIN com a tabela categories
-        WHERE a.group_id = ?
-        ORDER BY t.id DESC
-    `, [groupId], (err, rows) => {
+    `;
+
+    if (whereClauses.length > 0) {
+        query += ` WHERE ${whereClauses.join(' AND ')}`;
+    }
+
+    query += ` ORDER BY t.created_at DESC, t.id DESC`; // Ordena por data de criação mais recente e ID
+
+    db.all(query, params, (err, rows) => {
         if (err) {
             console.error('Erro no banco de dados:', err.message);
             return res.status(500).json({ message: 'Erro ao buscar transações', error: err.message });
@@ -556,33 +546,18 @@ app.get('/api/transactions', authenticate, (req, res) => {
     });
 });
 
-app.get('/api/accounts', authenticate, (req, res) => {
-    const groupId = req.groupId;
-    
-    console.log('--- GET /api/accounts ---');
-    console.log('Buscando contas para o Group ID:', groupId);
-
-    db.all(`SELECT * FROM accounts WHERE group_id = ?`, [groupId], (err, rows) => {
-        if (err) {
-            console.error('Erro no banco de dados:', err.message);
-            return res.status(500).json({ message: 'Erro ao buscar contas', error: err.message });
-        }
-        res.json(rows);
-    });
-});
-
 
 app.put('/api/transactions/:id', authenticate, (req, res) => {
     const { id } = req.params;
-    const { description, amount, type, account_id, due_date, category_id } = req.body; // Adiciona category_id
+    const { description, amount, type, account_id, due_date } = req.body;
     const userId = req.userId;
-
-    if (!category_id) { // category_id agora é obrigatório na edição
-        return res.status(400).json({ message: 'O ID da categoria é obrigatório.' });
-    }
-
-    db.run(`UPDATE transactions SET description = ?, amount = ?, type = ?, account_id = ?, due_date = ?, category_id = ? WHERE id = ? AND user_id = ?`, // Adiciona category_id aqui
-        [description, amount, type, account_id, due_date, category_id, id, userId],
+    db.run(`
+        UPDATE transactions
+        SET description = ?, amount = ?, type = ?, account_id = ?, due_date = ?
+        WHERE id = ?
+          AND account_id IN (SELECT id FROM accounts WHERE group_id = ?)
+    `,
+        [description, amount, type, account_id, due_date, id, req.groupId],
         function (err) {
             if (err) {
                 return res.status(500).json({ message: 'Erro ao atualizar transação', error: err.message });
@@ -598,7 +573,11 @@ app.put('/api/transactions/:id', authenticate, (req, res) => {
 app.delete('/api/transactions/:id', authenticate, (req, res) => {
     const { id } = req.params;
     const userId = req.userId;
-    db.run(`DELETE FROM transactions WHERE id = ? AND user_id = ?`, [id, userId], function (err) {
+    db.run(`
+        DELETE FROM transactions
+        WHERE id = ?
+          AND account_id IN (SELECT id FROM accounts WHERE group_id = ?)
+    `, [id, req.groupId], function (err) {
         if (err) {
             return res.status(500).json({ message: 'Erro ao deletar transação', error: err.message });
         }

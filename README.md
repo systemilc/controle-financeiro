@@ -25,16 +25,6 @@ O sistema conta com as seguintes funcionalidades:
 
 -----
 
-### Funcionalidades Adicionadas Recentemente
-
-- **Sistema de Categorias de Transações:**
-  - Crie categorias personalizadas (ex: "Salário", "Aluguel", "Alimentação") e associe-as a tipos de transação específicos (Entrada, Saída, ou Ambos).
-  - Vincule facilmente categorias a novas transações ou edite categorias de transações existentes.
-  - Acompanhe suas finanças com mais detalhes, visualizando as categorias diretamente no histórico de transações.
-  - Interface intuitiva com checkboxes para seleção de tipo de categoria, permitindo maior flexibilidade (Entrada, Saída, ou Ambos).
-
------
-
 ### Tecnologias
 
 **Front-end:**
