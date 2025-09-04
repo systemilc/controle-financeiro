@@ -196,4 +196,27 @@ export const api = {
         }
         return response.ok;
     },
+
+    // --- API DE ADMINISTRAÇÃO DE USUÁRIOS ---
+
+    fetchPendingUsers: async () => {
+        const response = await fetch('/api/admin/users/pending', { headers: headers() });
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Erro ao buscar usuários pendentes.');
+        }
+        return await response.json();
+    },
+
+    approveUser: async (id) => {
+        const response = await fetch(`/api/admin/users/${id}/approve`, {
+            method: 'PUT',
+            headers: headers(),
+        });
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Erro ao aprovar usuário.');
+        }
+        return response.ok;
+    },
 };

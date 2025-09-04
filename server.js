@@ -2,6 +2,7 @@ const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const bcrypt = require('bcryptjs');
 const path = require('path');
+const nodemailer = require('nodemailer'); // Adicione esta linha
 
 const app = express();
 const PORT = 3000;
@@ -19,6 +20,15 @@ const db = new sqlite3.Database('financas.db', (err) => {
     console.log('Conectado ao banco de dados SQLite.');
 });
 
+// Configuração do Nodemailer (use variáveis de ambiente para produção)
+const transporter = nodemailer.createTransport({
+    service: 'gmail', // Ou outro serviço de e-mail
+    auth: {
+        user: process.env.EMAIL_USER, // Seu e-mail (admin)
+        pass: process.env.EMAIL_PASS // Sua senha de aplicativo gerada para o e-mail
+    }
+});
+
 // Atualiza a estrutura do banco de dados para a nova lógica
 db.serialize(() => {
     db.run(`
@@ -27,12 +37,13 @@ db.serialize(() => {
             username TEXT UNIQUE,
             password TEXT,
             group_id INTEGER,
-            role TEXT DEFAULT 'user'
+            role TEXT DEFAULT 'user',
+            is_approved INTEGER DEFAULT 0
         )
     `);
 
     // Adiciona as novas colunas à tabela users se elas não existirem
-    const userColumns = ['whatsapp', 'instagram', 'email', 'consent_lgpd', 'role'];
+    const userColumns = ['whatsapp', 'instagram', 'email', 'consent_lgpd', 'role', 'is_approved'];
     userColumns.forEach(col => {
         db.all(`PRAGMA table_info(users)`, (err, tableInfo) => {
             if (!tableInfo || !Array.isArray(tableInfo) || !tableInfo.some(c => c.name === col)) {
@@ -41,6 +52,8 @@ db.serialize(() => {
                     columnType = 'INTEGER DEFAULT 0';
                 } else if (col === 'role') {
                     columnType = 'TEXT DEFAULT \'user\'';
+                } else if (col === 'is_approved') {
+                    columnType = 'INTEGER DEFAULT 0';
                 }
                 db.run(`ALTER TABLE users ADD COLUMN ${col} ${columnType}`, (err) => {
                     if (err) {
@@ -134,7 +147,7 @@ db.serialize(() => {
             bcrypt.hash('123456', SALT_ROUNDS, (err, hash) => {
                 if (err) throw err;
                 const groupId = 1; // Cria o primeiro grupo para o admin
-                db.run(`INSERT INTO users (username, password, group_id, role) VALUES (?, ?, ?, ?)`, ['admin', hash, groupId, 'admin'], (err) => {
+                db.run(`INSERT INTO users (username, password, group_id, role, is_approved) VALUES (?, ?, ?, ?, ?)`, ['admin', hash, groupId, 'admin', 1], (err) => {
                     if (err) {
                         console.error('Erro ao inserir usuário padrão:', err.message);
                     } else {
@@ -219,8 +232,8 @@ app.post('/api/register', (req, res) => {
                 // O group_id final será definido após a inserção para ser igual ao userId
                 const initialGroupId = 0; // Valor temporário
                 db.run(
-                    `INSERT INTO users (username, password, group_id, whatsapp, instagram, email, consent_lgpd, role) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-                    [username, hash, initialGroupId, whatsapp, instagram, email, consent_lgpd ? 1 : 0, 'user'],
+                    `INSERT INTO users (username, password, group_id, whatsapp, instagram, email, consent_lgpd, role, is_approved) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [username, hash, initialGroupId, whatsapp, instagram, email, consent_lgpd ? 1 : 0, 'user', 0],
                     function (err) {
                         if (err) {
                             return res.status(500).json({ message: 'Erro ao registrar usuário', error: err.message });
@@ -231,7 +244,30 @@ app.post('/api/register', (req, res) => {
                             if (updateErr) {
                                 console.error('Erro ao atualizar group_id do novo usuário:', updateErr.message);
                             }
-                            res.status(201).json({ message: 'Usuário registrado com sucesso!', userId: newUserId, groupId: newUserId, role: 'user' });
+
+                            // Enviar e-mail para o administrador
+                            const mailOptions = {
+                                from: process.env.EMAIL_USER,
+                                to: 'isaac.systemilc@gmail.com',
+                                subject: 'Novo Usuário Registrado - Aprovação Pendente',
+                                html: `<p>Um novo usuário se registrou no sistema e aguarda aprovação:</p>
+                                               <ul>
+                                                   <li>**ID do Usuário:** ${newUserId}</li>
+                                                   <li>**Nome de Usuário:** ${username}</li>
+                                                   <li>**Email:** ${email}</li>
+                                               </ul>
+                                               <p>Por favor, acesse o painel de administração para aprovar este usuário.</p>`
+                            };
+
+                            transporter.sendMail(mailOptions, (error, info) => {
+                                if (error) {
+                                    console.error('Erro ao enviar e-mail de notificação:', error);
+                                } else {
+                                    console.log('E-mail de notificação enviado:', info.response);
+                                }
+                            });
+
+                            res.status(201).json({ message: 'Usuário registrado com sucesso e aguardando aprovação!', userId: newUserId, groupId: newUserId, role: 'user' });
                         });
                     }
                 );
@@ -246,6 +282,12 @@ app.post('/api/login', (req, res) => {
         if (err || !user) {
             return res.status(400).json({ message: 'Usuário ou senha inválidos' });
         }
+        
+        // Verifica se o usuário foi aprovado
+        if (user.is_approved === 0) {
+            return res.status(403).json({ message: 'Sua conta ainda não foi aprovada pelo administrador.' });
+        }
+
         const match = await bcrypt.compare(password, user.password);
         if (match) {
             return res.json({ message: 'Login bem-sucedido', userId: user.id, groupId: user.group_id, userRole: user.role });
@@ -927,6 +969,38 @@ app.put('/api/users/:id/change-password', authenticate, async (req, res) => {
                 res.status(200).json({ message: 'Senha alterada com sucesso!' });
             });
         });
+    });
+});
+
+// Rota para listar usuários pendentes de aprovação (apenas para admin)
+app.get('/api/admin/users/pending', authenticate, authorizeRole('admin'), (req, res) => {
+    db.all(`SELECT id, username, email FROM users WHERE is_approved = 0`, [], (err, rows) => {
+        if (err) {
+            console.error('Erro ao buscar usuários pendentes:', err.message);
+            return res.status(500).json({ message: 'Erro ao buscar usuários pendentes.' });
+        }
+        res.json(rows);
+    });
+});
+
+// Rota para aprovar um usuário (apenas para admin)
+app.put('/api/admin/users/:id/approve', authenticate, authorizeRole('admin'), (req, res) => {
+    const { id } = req.params;
+    const userIdToApprove = parseInt(id);
+
+    if (isNaN(userIdToApprove)) {
+        return res.status(400).json({ message: 'ID do usuário inválido.' });
+    }
+
+    db.run(`UPDATE users SET is_approved = 1 WHERE id = ? AND is_approved = 0`, [userIdToApprove], function (err) {
+        if (err) {
+            console.error('Erro ao aprovar usuário:', err.message);
+            return res.status(500).json({ message: 'Erro ao aprovar usuário.' });
+        }
+        if (this.changes === 0) {
+            return res.status(404).json({ message: 'Usuário não encontrado, já aprovado ou sem permissão.' });
+        }
+        res.status(200).json({ message: 'Usuário aprovado com sucesso!' });
     });
 });
 

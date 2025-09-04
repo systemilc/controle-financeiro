@@ -127,6 +127,7 @@ export const elements = {
     // Gerenciamento de Usuários (Admin)
     adminUsersPage: document.getElementById('admin-users-page'),
     adminUsersList: document.getElementById('admin-users-list'),
+    pendingUsersList: document.getElementById('pending-users-list'), // Novo elemento
 
     // Botões
     logoutButton: document.getElementById('logout-button'),
@@ -818,6 +819,29 @@ export const render = {
                </td>
            `;
            elements.adminUsersList.appendChild(tr);
+       });
+   },
+
+   // Renderiza a lista de usuários pendentes de aprovação
+   renderPendingUsers: (users) => {
+       elements.pendingUsersList.innerHTML = '';
+       if (!users || users.length === 0) {
+           elements.pendingUsersList.innerHTML = '<li class="list-group-item text-center">Nenhum usuário pendente de aprovação.</li>';
+           return;
+       }
+       users.forEach(user => {
+           const li = document.createElement('li');
+           li.className = 'list-group-item d-flex justify-content-between align-items-center';
+           li.innerHTML = `
+               <div>
+                   <strong>${user.username}</strong> 
+                   <small class="text-muted">(${user.email})</small>
+               </div>
+               <button class="btn btn-success btn-sm approve-user-button" data-id="${user.id}" data-username="${user.username}">
+                   <i class="fas fa-check"></i> Aprovar
+               </button>
+           `;
+           elements.pendingUsersList.appendChild(li);
        });
    },
 

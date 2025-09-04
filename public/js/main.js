@@ -85,6 +85,13 @@ const fetchAllData = async () => {
             if (Array.isArray(usersData)) {
                 if (state.userRole === 'admin') {
                     render.renderAdminUsers(usersData); // Renderiza todos os usuários para o admin
+                    // Adiciona chamada para buscar e renderizar usuários pendentes
+                    const pendingUsersData = await api.fetchPendingUsers();
+                    if (Array.isArray(pendingUsersData)) {
+                        render.renderPendingUsers(pendingUsersData);
+                    } else {
+                        console.error('Erro ao carregar usuários pendentes:', pendingUsersData);
+                    }
                 } else if (state.userRole === 'user') {
                     // usersData já conterá apenas os colaboradores do usuário normal (conforme server.js)
                     render.renderGroupUsers(usersData);
@@ -965,6 +972,30 @@ elements.groupUsersList.addEventListener('click', async (e) => {
     } else if (e.target.closest('.edit-collaborator-button')) {
         const id = e.target.closest('.edit-collaborator-button').dataset.id;
         editUser(id);
+    }
+});
+
+// Event listeners para a página de usuários pendentes de aprovação
+elements.pendingUsersList.addEventListener('click', async (e) => {
+    const target = e.target.closest('.approve-user-button');
+    if (!target) return;
+
+    const id = target.dataset.id;
+    const username = target.dataset.username;
+
+    if (!confirm(`Tem certeza que deseja aprovar o usuário "${username}" (ID: ${id})?`)) return;
+
+    try {
+        const success = await api.approveUser(id);
+        if (success) {
+            alert('Usuário aprovado com sucesso!');
+            fetchAllData(); // Atualiza as listas de usuários
+        } else {
+            alert('Erro ao aprovar usuário.');
+        }
+    } catch (error) {
+        console.error('Erro ao aprovar usuário:', error);
+        alert(`Erro ao aprovar usuário: ${error.message || 'Erro desconhecido'}`);
     }
 });
 
