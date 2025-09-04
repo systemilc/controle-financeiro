@@ -31,13 +31,35 @@ const fetchAllData = async () => {
             console.error('Erro ao carregar categorias:', categoriesData.message);
         }
 
+        // Se estiver na página do dashboard, popular os filtros do dashboard após carregar as contas e categorias
+        if (state.currentPage === 'dashboard') {
+            render.populateDashboardFilters();
+        }
+
         // Coleta os parâmetros de filtro
-        const filters = collectTransactionFilters();
+        let filters = {};
+        if (state.currentPage === 'dashboard') {
+            filters = collectDashboardFilters();
+            console.log('Dashboard Filters collected:', filters);
+        } else {
+            filters = collectTransactionFilters();
+            console.log('Transaction Filters collected:', filters);
+        }
+        
         const transactionsData = await api.fetchTransactions(filters);
         
         if (Array.isArray(transactionsData)) {
             render.transactions(transactionsData);
             render.calculateBalances(transactionsData);
+
+            // Renderiza os gráficos se estiver na página do dashboard
+            if (state.currentPage === 'dashboard') {
+                // Gráfico de pizza por categoria ou tipo
+                const filterBy = elements.dashboardFilterTransactionType.value ? 'type' : 'category';
+                render.renderPieChart(transactionsData, filterBy);
+                render.renderBarChart(transactionsData); // Gráfico de barras
+            }
+
         } else {
             console.error('Erro ao carregar transações:', transactionsData);
             // Não faz logout por erro de transações, apenas loga o erro
@@ -1143,14 +1165,48 @@ const collectTransactionFilters = () => {
         filters.types = types.join(',');
     }
 
-    // Conta Bancária
-
     // Status de Confirmação
     if (elements.filterConfirmedSelect.value !== '') {
         filters.isConfirmed = elements.filterConfirmedSelect.value;
     }
 
     console.log('Filtros coletados:', filters);
+    return filters;
+};
+
+// Função para coletar os valores dos filtros do dashboard
+const collectDashboardFilters = () => {
+    const filters = {};
+
+    // Tipo de Período (due_date, created_at, confirmed_at)
+    if (elements.dashboardFilterPeriodType.value) {
+        filters.dateType = elements.dashboardFilterPeriodType.value;
+    }
+
+    // Intervalo de Data
+    if (elements.dashboardFilterDateStart.value) {
+        filters.dateStart = elements.dashboardFilterDateStart.value;
+    }
+    if (elements.dashboardFilterDateEnd.value) {
+        filters.dateEnd = elements.dashboardFilterDateEnd.value;
+    }
+
+    // Tipo de Transação (income, expense, ou ambos)
+    if (elements.dashboardFilterTransactionType.value) {
+        filters.types = elements.dashboardFilterTransactionType.value;
+    }
+
+    // Categoria
+    if (elements.dashboardFilterCategory.value) {
+        filters.category_id = elements.dashboardFilterCategory.value;
+    }
+
+    // Conta Bancária
+    if (elements.dashboardFilterAccount.value) {
+        filters.account_id = elements.dashboardFilterAccount.value;
+    }
+
+    console.log('Filtros coletados para dashboard:', filters);
     return filters;
 };
 
@@ -1175,6 +1231,23 @@ elements.clearFiltersButton.addEventListener('click', async () => {
     elements.filterConfirmedSelect.value = '';
 
     // Recarrega todos os dados sem filtros
+    await fetchAllData();
+});
+
+// Event listener para o formulário de filtros do dashboard
+elements.dashboardFiltersForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    await fetchAllData();
+});
+
+// Event listener para o botão Limpar Filtros do dashboard
+elements.dashboardClearFiltersButton.addEventListener('click', async () => {
+    elements.dashboardFilterPeriodType.value = 'due_date'; // Padrão
+    elements.dashboardFilterDateStart.value = '';
+    elements.dashboardFilterDateEnd.value = '';
+    elements.dashboardFilterTransactionType.value = ''; // Padrão: Todos
+    elements.dashboardFilterCategory.value = ''; // Padrão: Todas
+    elements.dashboardFilterAccount.value = ''; // Padrão: Todas
     await fetchAllData();
 });
 

@@ -52,6 +52,19 @@ export const elements = {
     grandTotalBalance: document.getElementById('grand-total-balance'),
     grandTotalStatus: document.getElementById('grand-total-status'),
     
+    // Novos elementos do Dashboard para filtros e gráficos
+    dashboardFiltersForm: document.getElementById('dashboard-filters-form'),
+    dashboardFilterPeriodType: document.getElementById('dashboard-filter-period-type'),
+    dashboardFilterDateStart: document.getElementById('dashboard-filter-date-start'),
+    dashboardFilterDateEnd: document.getElementById('dashboard-filter-date-end'),
+    dashboardFilterTransactionType: document.getElementById('dashboard-filter-transaction-type'),
+    dashboardFilterCategory: document.getElementById('dashboard-filter-category'),
+    dashboardFilterAccount: document.getElementById('dashboard-filter-account'),
+    dashboardApplyFiltersButton: document.getElementById('dashboard-apply-filters-button'),
+    dashboardClearFiltersButton: document.getElementById('dashboard-clear-filters-button'),
+    pieChartCanvas: document.getElementById('pieChartCanvas'),
+    barChartCanvas: document.getElementById('barChartCanvas'),
+    
     // Contas
     accountNameInput: document.getElementById('account-name'),
     accountForm: document.getElementById('account-form'),
@@ -210,6 +223,10 @@ const renderDetailedAccountsSummary = (accountBalances, totalIncome, totalExpens
     console.log('--- Resumo detalhado renderizado com sucesso ---');
 };
 
+// Variáveis globais para os objetos Chart.js
+let pieChartInstance = null;
+let barChartInstance = null;
+
 export const render = {
     // Navegação
     showPage: (pageName) => {
@@ -276,6 +293,11 @@ export const render = {
         // Se navegou para a página de contas, atualiza o formulário de transferência
         if (pageName === 'contas' && state.accountBalances) {
             render.updateTransferForm();
+        }
+        // Se for para o dashboard, popular os filtros e desenhar os gráficos
+        if (pageName === 'dashboard') {
+            render.populateDashboardFilters();
+            // Os gráficos serão renderizados após fetchAllData no main.js
         }
     },
     
@@ -431,6 +453,151 @@ export const render = {
         }
         
         console.log('--- CÁLCULO DE SALDOS CONCLUÍDO ---');
+    },
+    
+    // Popula os selects de contas e categorias nos filtros do dashboard
+    populateDashboardFilters: () => {
+        // Popula o select de contas
+        elements.dashboardFilterAccount.innerHTML = '<option value="">Todas</option>';
+        state.allAccounts.forEach(account => {
+            const option = document.createElement('option');
+            option.value = account.id;
+            option.textContent = account.name;
+            elements.dashboardFilterAccount.appendChild(option);
+        });
+
+        // Popula o select de categorias
+        elements.dashboardFilterCategory.innerHTML = '<option value="">Todas</option>';
+        state.allCategories.forEach(category => {
+            const option = document.createElement('option');
+            option.value = category.id;
+            option.textContent = category.name;
+            elements.dashboardFilterCategory.appendChild(option);
+        });
+    },
+
+    renderPieChart: (transactions, filterBy = 'category') => {
+        if (pieChartInstance) {
+            pieChartInstance.destroy();
+        }
+        
+        const ctx = elements.pieChartCanvas.getContext('2d');
+        const dataMap = {};
+        
+        transactions.filter(t => t.is_confirmed).forEach(t => {
+            let key;
+            let label;
+
+            if (filterBy === 'category') {
+                key = t.category_id || 'N/A';
+                label = t.category_name || 'Sem Categoria';
+            } else if (filterBy === 'type') {
+                key = t.type;
+                label = t.type === 'income' ? 'Receita' : 'Despesa';
+            }
+
+            if (dataMap[key]) {
+                dataMap[key].amount += parseFloat(t.amount);
+            } else {
+                dataMap[key] = { label, amount: parseFloat(t.amount) };
+            }
+        });
+
+        const labels = Object.values(dataMap).map(d => d.label);
+        const data = Object.values(dataMap).map(d => d.amount);
+        const backgroundColors = generateColors(labels.length);
+
+        pieChartInstance = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    backgroundColor: backgroundColors,
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    },
+                    title: {
+                        display: true,
+                        text: `Distribuição por ${filterBy === 'category' ? 'Categoria' : 'Tipo'}`
+                    }
+                }
+            },
+        });
+    },
+
+    renderBarChart: (transactions) => {
+        if (barChartInstance) {
+            barChartInstance.destroy();
+        }
+
+        const ctx = elements.barChartCanvas.getContext('2d');
+        const monthlyData = {}; // { 'YYYY-MM': { income: X, expense: Y } }
+
+        transactions.filter(t => t.is_confirmed).forEach(t => {
+            const date = new Date(t.due_date || t.created_at);
+            const monthYear = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+            const amount = parseFloat(t.amount);
+
+            if (!monthlyData[monthYear]) {
+                monthlyData[monthYear] = { income: 0, expense: 0 };
+            }
+
+            if (t.type === 'income') {
+                monthlyData[monthYear].income += amount;
+            } else if (t.type === 'expense') {
+                monthlyData[monthYear].expense += amount;
+            }
+        });
+
+        const sortedMonths = Object.keys(monthlyData).sort();
+        const incomes = sortedMonths.map(month => monthlyData[month].income);
+        const expenses = sortedMonths.map(month => monthlyData[month].expense);
+
+        barChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: sortedMonths,
+                datasets: [
+                    {
+                        label: 'Receitas',
+                        data: incomes,
+                        backgroundColor: 'rgba(75, 192, 192, 0.6)',
+                    },
+                    {
+                        label: 'Despesas',
+                        data: expenses,
+                        backgroundColor: 'rgba(255, 99, 132, 0.6)',
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: {
+                        stacked: false,
+                    },
+                    y: {
+                        stacked: false,
+                        beginAtZero: true
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    },
+                    title: {
+                        display: true,
+                        text: 'Evolução Mensal de Receitas e Despesas'
+                    }
+                }
+            }
+        });
     },
     
     // Contas
@@ -745,4 +912,12 @@ export const render = {
     },
 };
 
-// Funções de transferência
+// Função para gerar cores aleatórias (para os gráficos)
+function generateColors(numColors) {
+    const colors = [];
+    for (let i = 0; i < numColors; i++) {
+        const hue = (i * 137 + 50) % 360; // Usa um algoritmo para distribuir as cores
+        colors.push(`hsl(${hue}, 70%, 60%)`);
+    }
+    return colors;
+}

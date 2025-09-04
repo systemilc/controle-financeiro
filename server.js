@@ -501,8 +501,8 @@ app.get('/api/transactions', authenticate, (req, res) => {
     console.log('Buscando transações para o Group ID:', groupId);
 
     // Extrai os parâmetros de filtro da query string
-    const { dateType, dateStart, dateEnd, types, accountId, isConfirmed } = req.query;
-    console.log('Filtros recebidos no backend:', { dateType, dateStart, dateEnd, types, accountId, isConfirmed });
+    const { dateType, dateStart, dateEnd, types, account_id, category_id, isConfirmed } = req.query; // Adicionado category_id
+    console.log('Filtros recebidos no backend:', { dateType, dateStart, dateEnd, types, account_id, category_id, isConfirmed });
 
     let whereClauses = ['a.group_id = ?'];
     let params = [groupId];
@@ -524,6 +524,18 @@ app.get('/api/transactions', authenticate, (req, res) => {
         } else if (typeArray.length === 2 && typeArray.includes('income') && typeArray.includes('expense')) {
             // Se ambos forem selecionados, não adiciona filtro por tipo
         }
+    }
+
+    // Filtro por conta bancária
+    if (account_id) {
+        whereClauses.push(`t.account_id = ?`);
+        params.push(account_id);
+    }
+
+    // Filtro por categoria
+    if (category_id) {
+        whereClauses.push(`t.category_id = ?`);
+        params.push(category_id);
     }
 
     // Status de Confirmação
