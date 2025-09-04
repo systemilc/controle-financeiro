@@ -572,6 +572,35 @@ app.get('/api/transactions', authenticate, (req, res) => {
     });
 });
 
+app.get('/api/transactions/:id', authenticate, (req, res) => {
+    const { id } = req.params;
+    const transactionId = parseInt(id);
+    const groupId = req.groupId;
+
+    if (isNaN(transactionId)) {
+        return res.status(400).json({ message: 'ID da transação inválido.' });
+    }
+
+    const query = `
+        SELECT t.*, a.name as account_name, u.username as creator_name, c.name as category_name
+        FROM transactions t
+        LEFT JOIN accounts a ON t.account_id = a.id
+        LEFT JOIN users u ON t.user_id = u.id
+        LEFT JOIN categories c ON t.category_id = c.id
+        WHERE t.id = ? AND a.group_id = ?
+    `;
+
+    db.get(query, [transactionId, groupId], (err, row) => {
+        if (err) {
+            console.error('Erro ao buscar transação por ID:', err.message);
+            return res.status(500).json({ message: 'Erro ao buscar transação.', error: err.message });
+        }
+        if (!row) {
+            return res.status(404).json({ message: 'Transação não encontrada ou sem permissão.' });
+        }
+        res.json(row);
+    });
+});
 
 app.put('/api/transactions/:id', authenticate, (req, res) => {
     const { id } = req.params;
