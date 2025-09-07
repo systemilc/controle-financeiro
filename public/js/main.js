@@ -426,7 +426,7 @@ const handleRegistrationSubmit = async (e) => {
     }
 
     try {
-        const success = await api.registerUser(username, password, whatsapp, instagram, email, consentLGPD);
+        const success = await api.registerUser(username, password, whatsapp, instagram, email, consentLGPD ? 1 : 0);
         if (success) {
             alert('Cadastro realizado com sucesso! Faça login para continuar.');
             render.showLoginScreen();

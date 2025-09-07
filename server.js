@@ -2,7 +2,6 @@ const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const bcrypt = require('bcryptjs');
 const path = require('path');
-const nodemailer = require('nodemailer'); // Adicione esta linha
 
 const app = express();
 const PORT = 3000;
@@ -18,15 +17,6 @@ const db = new sqlite3.Database('financas.db', (err) => {
         console.error(err.message);
     }
     console.log('Conectado ao banco de dados SQLite.');
-});
-
-// Configuração do Nodemailer (use variáveis de ambiente para produção)
-const transporter = nodemailer.createTransport({
-    service: 'gmail', // Ou outro serviço de e-mail
-    auth: {
-        user: process.env.EMAIL_USER, // Seu e-mail (admin)
-        pass: process.env.EMAIL_PASS // Sua senha de aplicativo gerada para o e-mail
-    }
 });
 
 // Atualiza a estrutura do banco de dados para a nova lógica
@@ -196,9 +186,10 @@ const authorizeRole = (requiredRole) => (req, res, next) => {
 // --- ROTAS DA API ---
 
 app.post('/api/register', (req, res) => {
+    console.log('Dados de registro recebidos:', req.body);
     const { username, password, whatsapp, instagram, email, consent_lgpd } = req.body;
 
-    if (!username || !password || !email || !consent_lgpd) {
+    if (!username || !password || !email || consent_lgpd !== 1) {
         return res.status(400).json({ message: 'Por favor, preencha todos os campos obrigatórios e aceite os termos da LGPD.' });
     }
 
@@ -213,64 +204,53 @@ app.post('/api/register', (req, res) => {
         return res.status(400).json({ message: 'A senha deve ter no mínimo 6 caracteres, com letras maiúsculas, minúsculas, números e caracteres especiais.' });
     }
 
-    db.get("SELECT * FROM users WHERE username = ? OR email = ?", [username, email], (err, row) => {
+    db.get("SELECT * FROM users WHERE username = ?", [username], (err, userRow) => {
         if (err) {
-            return res.status(500).json({ message: 'Erro no banco de dados', error: err.message });
+            console.error('Erro ao verificar nome de usuário:', err.message);
+            return res.status(500).json({ message: 'Erro no banco de dados' });
         }
-        if (row) {
-            return res.status(400).json({ message: 'Usuário ou e-mail já cadastrado.' });
+        if (userRow) {
+            return res.status(400).json({ message: 'Nome de usuário já cadastrado.' });
         }
 
-        bcrypt.hash(password, SALT_ROUNDS, (err, hash) => {
+        db.get("SELECT * FROM users WHERE email = ?", [email], (err, emailRow) => {
             if (err) {
-                return res.status(500).json({ message: 'Erro ao criptografar senha', error: err.message });
+                console.error('Erro ao verificar e-mail:', err.message);
+                return res.status(500).json({ message: 'Erro no banco de dados' });
+            }
+            if (emailRow) {
+                return res.status(400).json({ message: 'E-mail já cadastrado.' });
             }
 
-            // Encontra o maior group_id existente e adiciona 1, ou usa 1 se não houver nenhum
-            db.get("SELECT MAX(group_id) as max_group_id FROM users", (err, result) => {
-                // Cada novo registro terá seu próprio grupo (group_id = id do usuário)
-                // O group_id final será definido após a inserção para ser igual ao userId
-                const initialGroupId = 0; // Valor temporário
-                db.run(
-                    `INSERT INTO users (username, password, group_id, whatsapp, instagram, email, consent_lgpd, role, is_approved) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                    [username, hash, initialGroupId, whatsapp, instagram, email, consent_lgpd ? 1 : 0, 'user', 0],
-                    function (err) {
-                        if (err) {
-                            return res.status(500).json({ message: 'Erro ao registrar usuário', error: err.message });
-                        }
-                        const newUserId = this.lastID;
-                        // Atualiza o group_id para ser igual ao userId
-                        db.run(`UPDATE users SET group_id = ? WHERE id = ?`, [newUserId, newUserId], (updateErr) => {
-                            if (updateErr) {
-                                console.error('Erro ao atualizar group_id do novo usuário:', updateErr.message);
+            bcrypt.hash(password, SALT_ROUNDS, (err, hash) => {
+                if (err) {
+                    return res.status(500).json({ message: 'Erro ao criptografar senha', error: err.message });
+                }
+
+                // Encontra o maior group_id existente e adiciona 1, ou usa 1 se não houver nenhum
+                db.get("SELECT MAX(group_id) as max_group_id FROM users", (err, result) => {
+                    // Cada novo registro terá seu próprio grupo (group_id = id do usuário)
+                    // O group_id final será definido após a inserção para ser igual ao userId
+                    const initialGroupId = 0; // Valor temporário
+                    db.run(
+                        `INSERT INTO users (username, password, group_id, whatsapp, instagram, email, consent_lgpd, role, is_approved) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                        [username, hash, initialGroupId, whatsapp, instagram, email, consent_lgpd ? 1 : 0, 'user', 0],
+                        function (err) {
+                            if (err) {
+                                return res.status(500).json({ message: 'Erro ao registrar usuário', error: err.message });
                             }
-
-                            // Enviar e-mail para o administrador
-                            const mailOptions = {
-                                from: process.env.EMAIL_USER,
-                                to: 'isaac.systemilc@gmail.com',
-                                subject: 'Novo Usuário Registrado - Aprovação Pendente',
-                                html: `<p>Um novo usuário se registrou no sistema e aguarda aprovação:</p>
-                                               <ul>
-                                                   <li>**ID do Usuário:** ${newUserId}</li>
-                                                   <li>**Nome de Usuário:** ${username}</li>
-                                                   <li>**Email:** ${email}</li>
-                                               </ul>
-                                               <p>Por favor, acesse o painel de administração para aprovar este usuário.</p>`
-                            };
-
-                            transporter.sendMail(mailOptions, (error, info) => {
-                                if (error) {
-                                    console.error('Erro ao enviar e-mail de notificação:', error);
-                                } else {
-                                    console.log('E-mail de notificação enviado:', info.response);
+                            const newUserId = this.lastID;
+                            // Atualiza o group_id para ser igual ao userId
+                            db.run(`UPDATE users SET group_id = ? WHERE id = ?`, [newUserId, newUserId], (updateErr) => {
+                                if (updateErr) {
+                                    console.error('Erro ao atualizar group_id do novo usuário:', updateErr.message);
                                 }
-                            });
 
-                            res.status(201).json({ message: 'Usuário registrado com sucesso e aguardando aprovação!', userId: newUserId, groupId: newUserId, role: 'user' });
-                        });
-                    }
-                );
+                                res.status(201).json({ message: 'Usuário registrado com sucesso e aguardando aprovação!', userId: newUserId, groupId: newUserId, role: 'user' });
+                            });
+                        }
+                    );
+                });
             });
         });
     });
