@@ -1131,6 +1131,51 @@ export const render = {
         render.showImportStep(1);
     },
 
+    showProductDetailsModal: (product, purchaseHistory) => {
+        // Preencher informações básicas
+        document.getElementById('product-name').textContent = product.name;
+        document.getElementById('product-code').textContent = product.code;
+        document.getElementById('product-created').textContent = product.created_at;
+        document.getElementById('product-suppliers').textContent = product.suppliers;
+
+        // Preencher estatísticas
+        document.getElementById('product-total-quantity').textContent = product.total_quantity;
+        document.getElementById('product-average-price').textContent = `R$ ${product.average_price}`;
+        document.getElementById('product-last-price').textContent = `R$ ${product.last_price}`;
+        document.getElementById('product-last-purchase').textContent = product.last_purchase;
+
+        // Preencher histórico de compras
+        const historyTable = document.getElementById('product-purchase-history');
+        const noHistoryDiv = document.getElementById('no-purchase-history');
+        
+        historyTable.innerHTML = '';
+        
+        if (purchaseHistory && purchaseHistory.length > 0) {
+            noHistoryDiv.style.display = 'none';
+            
+            purchaseHistory.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="text-center">${item.invoice_number}</td>
+                    <td class="text-start">${item.supplier_name}</td>
+                    <td class="text-center">${item.purchase_date}</td>
+                    <td class="text-center">${item.quantity}</td>
+                    <td class="text-end">R$ ${item.unit_price}</td>
+                    <td class="text-end">R$ ${item.total}</td>
+                    <td class="text-start">${item.account_name}</td>
+                    <td class="text-start">${item.payment_type_name}</td>
+                `;
+                historyTable.appendChild(tr);
+            });
+        } else {
+            noHistoryDiv.style.display = 'block';
+        }
+
+        // Mostrar o modal
+        const modal = new bootstrap.Modal(document.getElementById('productDetailsModal'));
+        modal.show();
+    },
+
     // Produtos
     renderProductsList: (products) => {
         const productsList = document.getElementById('products-list');

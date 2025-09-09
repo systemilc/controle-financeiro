@@ -1392,9 +1392,14 @@ window.loadAllProducts = async () => {
     }
 };
 
-window.viewProductDetails = (productId) => {
-    // Implementar modal de detalhes do produto
-    alert('Funcionalidade de detalhes do produto será implementada em breve!');
+window.viewProductDetails = async (productId) => {
+    try {
+        const data = await api.fetchProductDetails(productId);
+        render.showProductDetailsModal(data.product, data.purchaseHistory);
+    } catch (error) {
+        console.error('Erro ao carregar detalhes do produto:', error);
+        alert('Erro ao carregar detalhes do produto: ' + error.message);
+    }
 };
 
 // Carregar produtos quando a página for exibida

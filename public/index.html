@@ -657,6 +657,117 @@
                     </div>
                 </div>
 
+                <!-- Modal de Detalhes do Produto -->
+                <div class="modal fade" id="productDetailsModal" tabindex="-1" aria-labelledby="productDetailsModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-xl">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="productDetailsModalLabel">Detalhes do Produto</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <!-- Informações Básicas do Produto -->
+                                <div class="row mb-4">
+                                    <div class="col-12">
+                                        <div class="card">
+                                            <div class="card-header">
+                                                <h6 class="mb-0"><i class="fas fa-box me-2"></i>Informações Básicas</h6>
+                                            </div>
+                                            <div class="card-body">
+                                                <div class="row">
+                                                    <div class="col-md-6">
+                                                        <p><strong>Nome:</strong> <span id="product-name"></span></p>
+                                                        <p><strong>Código:</strong> <span id="product-code"></span></p>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <p><strong>Data de Cadastro:</strong> <span id="product-created"></span></p>
+                                                        <p><strong>Fornecedores:</strong> <span id="product-suppliers"></span></p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Estatísticas do Produto -->
+                                <div class="row mb-4">
+                                    <div class="col-md-3">
+                                        <div class="card text-center">
+                                            <div class="card-body">
+                                                <h5 class="card-title text-primary" id="product-total-quantity">0</h5>
+                                                <p class="card-text">Quantidade Total</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="card text-center">
+                                            <div class="card-body">
+                                                <h5 class="card-title text-success" id="product-average-price">R$ 0,00</h5>
+                                                <p class="card-text">Preço Médio</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="card text-center">
+                                            <div class="card-body">
+                                                <h5 class="card-title text-info" id="product-last-price">R$ 0,00</h5>
+                                                <p class="card-text">Último Preço</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="card text-center">
+                                            <div class="card-body">
+                                                <h5 class="card-title text-warning" id="product-last-purchase">N/A</h5>
+                                                <p class="card-text">Última Compra</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Histórico de Compras -->
+                                <div class="row">
+                                    <div class="col-12">
+                                        <div class="card">
+                                            <div class="card-header">
+                                                <h6 class="mb-0"><i class="fas fa-history me-2"></i>Histórico de Compras</h6>
+                                            </div>
+                                            <div class="card-body">
+                                                <div class="table-responsive">
+                                                    <table class="table table-sm table-striped">
+                                                        <thead class="table-dark">
+                                                            <tr>
+                                                                <th class="text-center" style="width: 10%;">Nota Fiscal</th>
+                                                                <th class="text-start" style="width: 20%;">Fornecedor</th>
+                                                                <th class="text-center" style="width: 10%;">Data</th>
+                                                                <th class="text-center" style="width: 8%;">Quantidade</th>
+                                                                <th class="text-end" style="width: 12%;">Preço Unitário</th>
+                                                                <th class="text-end" style="width: 12%;">Total</th>
+                                                                <th class="text-start" style="width: 15%;">Conta</th>
+                                                                <th class="text-start" style="width: 13%;">Tipo Pagamento</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody id="product-purchase-history">
+                                                            <!-- Dados serão inseridos via JavaScript -->
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                                <div id="no-purchase-history" class="text-center text-muted py-4" style="display: none;">
+                                                    <i class="fas fa-shopping-cart fa-3x mb-3"></i>
+                                                    <p>Nenhuma compra registrada para este produto.</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Transações -->
                 <div id="transacoes-page" class="page-content hidden">
                     <!-- Seção Adicionar Transação (agora no topo) -->

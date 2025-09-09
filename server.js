@@ -1119,6 +1119,92 @@ app.get('/api/products', authenticate, (req, res) => {
     });
 });
 
+// GET: Buscar detalhes completos de um produto
+app.get('/api/products/:id/details', authenticate, (req, res) => {
+    const productId = req.params.id;
+    const groupId = req.groupId;
+    
+    // Buscar informações básicas do produto
+    const productQuery = `
+        SELECT 
+            p.id, p.name, p.code, p.created_at,
+            GROUP_CONCAT(DISTINCT s.name) as suppliers,
+            AVG(pi.unit_price) as average_price,
+            MAX(pi.unit_price) as last_price,
+            SUM(pi.quantity) as total_quantity,
+            MAX(pur.purchase_date) as last_purchase
+        FROM products p
+        LEFT JOIN purchase_items pi ON p.id = pi.product_id
+        LEFT JOIN purchases pur ON pi.purchase_id = pur.id
+        LEFT JOIN suppliers s ON pur.supplier_id = s.id
+        WHERE p.id = ? AND p.group_id = ?
+        GROUP BY p.id, p.name, p.code, p.created_at
+    `;
+    
+    // Buscar histórico de compras do produto
+    const historyQuery = `
+        SELECT 
+            pur.invoice_number,
+            s.name as supplier_name,
+            pur.purchase_date,
+            pi.quantity,
+            pi.unit_price,
+            (pi.quantity * pi.unit_price) as total,
+            a.name as account_name,
+            pt.name as payment_type_name
+        FROM purchase_items pi
+        JOIN purchases pur ON pi.purchase_id = pur.id
+        JOIN suppliers s ON pur.supplier_id = s.id
+        JOIN accounts a ON pur.account_id = a.id
+        JOIN payment_types pt ON pur.payment_type_id = pt.id
+        WHERE pi.product_id = ? AND pur.group_id = ?
+        ORDER BY pur.purchase_date DESC, pur.created_at DESC
+    `;
+    
+    db.get(productQuery, [productId, groupId], (err, product) => {
+        if (err) {
+            console.error('Erro ao buscar produto:', err);
+            return res.status(500).json({ message: 'Erro interno do servidor' });
+        }
+        
+        if (!product) {
+            return res.status(404).json({ message: 'Produto não encontrado' });
+        }
+        
+        // Buscar histórico de compras
+        db.all(historyQuery, [productId, groupId], (err, history) => {
+            if (err) {
+                console.error('Erro ao buscar histórico:', err);
+                return res.status(500).json({ message: 'Erro interno do servidor' });
+            }
+            
+            // Formatar dados do produto
+            const formattedProduct = {
+                ...product,
+                suppliers: product.suppliers || 'N/A',
+                average_price: product.average_price ? parseFloat(product.average_price).toFixed(2) : '0,00',
+                last_price: product.last_price ? parseFloat(product.last_price).toFixed(2) : '0,00',
+                total_quantity: product.total_quantity || 0,
+                last_purchase: product.last_purchase || 'N/A',
+                created_at: new Date(product.created_at).toLocaleDateString('pt-BR')
+            };
+            
+            // Formatar histórico de compras
+            const formattedHistory = history.map(item => ({
+                ...item,
+                purchase_date: new Date(item.purchase_date).toLocaleDateString('pt-BR'),
+                unit_price: parseFloat(item.unit_price).toFixed(2).replace('.', ','),
+                total: parseFloat(item.total).toFixed(2).replace('.', ',')
+            }));
+            
+            res.json({
+                product: formattedProduct,
+                purchaseHistory: formattedHistory
+            });
+        });
+    });
+});
+
 // GET: Buscar produtos por nome ou código
 app.get('/api/products/search', authenticate, (req, res) => {
     const { q } = req.query;

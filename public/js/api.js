@@ -360,4 +360,10 @@ export const api = {
         }
         return await response.json();
     },
+
+    // --- API DE DETALHES DO PRODUTO ---
+    fetchProductDetails: async (id) => {
+        const response = await fetch(`/api/products/${id}/details`, { headers: headers() });
+        return await response.json();
+    }
 };

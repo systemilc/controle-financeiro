@@ -577,6 +577,66 @@ header {
     visibility: visible !important;
 }
 
+/* Estilos para o modal de detalhes do produto */
+#productDetailsModal .modal-xl {
+    max-width: 95%;
+}
+
+#productDetailsModal .card {
+    border: 1px solid #dee2e6;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+#productDetailsModal .card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    font-weight: 600;
+}
+
+#productDetailsModal .card-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+#productDetailsModal .text-primary {
+    color: #0d6efd !important;
+}
+
+#productDetailsModal .text-success {
+    color: #198754 !important;
+}
+
+#productDetailsModal .text-info {
+    color: #0dcaf0 !important;
+}
+
+#productDetailsModal .text-warning {
+    color: #ffc107 !important;
+}
+
+#productDetailsModal .table th {
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+#productDetailsModal .table td {
+    font-size: 0.875rem;
+    vertical-align: middle;
+}
+
+#productDetailsModal .table-responsive {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+#no-purchase-history {
+    color: #6c757d;
+}
+
+#no-purchase-history i {
+    opacity: 0.5;
+}
+
 /* Ajustes para o modal de importação */
 .import-step {
     min-height: 300px;
