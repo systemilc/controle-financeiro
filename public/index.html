@@ -138,6 +138,12 @@
                     </a>
                 </li>
                 <li class="nav-item">
+                    <a class="nav-link" href="#tipos-pagamento" data-page="tipos-pagamento">
+                        <i class="fas fa-credit-card me-2"></i>
+                        <span class="nav-text">Tipos de Pagamento</span>
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a class="nav-link" href="#transacoes" data-page="transacoes">
                         <i class="fas fa-exchange-alt me-2"></i>
                         <span class="nav-text">Transações</span>
@@ -371,6 +377,51 @@
                     </div>
                 </div>
 
+                <!-- Tipos de Pagamento -->
+                <div id="tipos-pagamento-page" class="page-content hidden">
+                    <div class="row">
+                        <div class="col-md-6 mb-4">
+                            <div class="card p-3 shadow-sm">
+                                <form id="payment-type-form">
+                                    <h2 class="text-primary">Adicionar Tipo de Pagamento</h2>
+                                    <div class="mb-3">
+                                        <label for="payment-type-name" class="form-label">Nome do Tipo:</label>
+                                        <input type="text" class="form-control" id="payment-type-name" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Aplicável para:</label>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="payment-type-income">
+                                            <label class="form-check-label" for="payment-type-income">
+                                                Entrada
+                                            </label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="payment-type-expense">
+                                            <label class="form-check-label" for="payment-type-expense">
+                                                Saída
+                                            </label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="payment-type-asset">
+                                            <label class="form-check-label" for="payment-type-asset">
+                                                Ativo
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary w-100">Adicionar Tipo de Pagamento</button>
+                                </form>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-4">
+                            <div class="card p-3 shadow-sm">
+                                <h2 class="text-primary">Lista de Tipos de Pagamento</h2>
+                                <ul id="payment-types-list" class="list-group list-group-flush"></ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Transações -->
                 <div id="transacoes-page" class="page-content hidden">
                     <!-- Seção Adicionar Transação (agora no topo) -->
@@ -392,10 +443,16 @@
                                                 <option value="expense">Despesa</option>
                                             </select>
                                         </div>
-                                        <div class="col-md-12">
+                                        <div class="col-md-6">
                                             <label for="category-select" class="form-label">Categoria:</label>
                                             <select class="form-select" id="category-select">
                                                 <option value="">Nenhuma</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="payment-type-select" class="form-label">Tipo de Pagamento:</label>
+                                            <select class="form-select" id="payment-type-select">
+                                                <option value="">Nenhum</option>
                                             </select>
                                         </div>
                                         <div class="col-md-12">
@@ -513,6 +570,7 @@
                                                      <th style="width: 80px;">Tipo</th>
                                                      <th style="width: 120px;">Conta</th>
                                                      <th style="width: 120px;">Categoria</th>
+                                                     <th style="width: 120px;">Pagamento</th>
                                                      <th style="width: 120px;">Lançamento</th>
                                                      <th style="width: 120px;">Vencimento</th>
                                                      <th style="width: 120px;">Confirmação</th>

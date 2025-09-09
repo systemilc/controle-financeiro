@@ -102,6 +102,15 @@ export const elements = {
     categoriesList: document.getElementById('categories-list'),
     categorySelect: document.getElementById('category-select'), // Select de categorias no formulário de transações
     
+    // Tipos de Pagamento
+    paymentTypeNameInput: document.getElementById('payment-type-name'),
+    paymentTypeIncomeCheckbox: document.getElementById('payment-type-income'),
+    paymentTypeExpenseCheckbox: document.getElementById('payment-type-expense'),
+    paymentTypeAssetCheckbox: document.getElementById('payment-type-asset'),
+    paymentTypeForm: document.getElementById('payment-type-form'),
+    paymentTypesList: document.getElementById('payment-types-list'),
+    paymentTypeSelect: document.getElementById('payment-type-select'), // Select de tipos de pagamento no formulário de transações
+    
     // Filtros de Transações
     transactionFiltersForm: document.getElementById('transaction-filters-form'),
     filterDateRangeStart: document.getElementById('filter-date-range-start'),
@@ -277,6 +286,8 @@ export const render = {
         const pageTitles = {
             'dashboard': 'Dashboard',
             'contas': 'Contas Bancárias',
+            'categorias': 'Categorias',
+            'tipos-pagamento': 'Tipos de Pagamento',
             'transacoes': 'Transações',
             'usuarios': 'Usuários do Grupo',
             'transferencia': 'Transferência de Saldo',
@@ -703,6 +714,7 @@ export const render = {
                 <td>${transaction.type === 'income' ? 'Receita' : 'Despesa'}</td>
                 <td>${accountName}</td>
                 <td>${transaction.category_name || 'N/A'}</td>
+                <td>${transaction.payment_type_name || 'N/A'}</td>
                 <td>${formatDateForDisplay(transaction.created_at)}</td>
                 <td>${transaction.due_date ? formatDateForDisplay(transaction.due_date) : 'N/A'}</td>
                 <td>${transaction.is_confirmed && transaction.confirmed_at ? formatDateForDisplay(transaction.confirmed_at) : 'Não Confirmada'}</td>
@@ -767,6 +779,7 @@ export const render = {
         elements.submitButton.textContent = 'Adicionar';
         elements.multiplierInput.value = 1; // Reseta o multiplicador para 1
         elements.categorySelect.value = ''; // Reseta o campo de categoria
+        elements.paymentTypeSelect.value = ''; // Reseta o campo de tipo de pagamento
         // As linhas de reset para os campos de adição de usuário foram movidas para serem chamadas apenas após o sucesso do cadastro.
     },
     
@@ -932,6 +945,59 @@ export const render = {
             option.value = category.id;
             option.textContent = category.name;
             elements.categorySelect.appendChild(option);
+        });
+    },
+
+    // Tipos de Pagamento
+    renderPaymentTypesList: (paymentTypes) => {
+        elements.paymentTypesList.innerHTML = '';
+        if (!paymentTypes || paymentTypes.length === 0) {
+            elements.paymentTypesList.innerHTML = '<li class="list-group-item text-center text-muted">Nenhum tipo de pagamento cadastrado.</li>';
+            return;
+        }
+        paymentTypes.forEach(paymentType => {
+            const li = document.createElement('li');
+            li.className = 'list-group-item d-flex justify-content-between align-items-center';
+            
+            // Cria badges para mostrar os tipos
+            const badges = [];
+            if (paymentType.is_income) badges.push('<span class="badge bg-success me-1">Entrada</span>');
+            if (paymentType.is_expense) badges.push('<span class="badge bg-danger me-1">Saída</span>');
+            if (paymentType.is_asset) badges.push('<span class="badge bg-primary me-1">Ativo</span>');
+            
+            li.innerHTML = `
+                <div>
+                    <strong>${paymentType.name}</strong>
+                    <div class="mt-1">${badges.join('')}</div>
+                </div>
+                <div>
+                    <button class="btn btn-info btn-sm me-2 edit-payment-type-button" data-id="${paymentType.id}" data-name="${paymentType.name}" data-income="${paymentType.is_income}" data-expense="${paymentType.is_expense}" data-asset="${paymentType.is_asset}">
+                        <i class="fas fa-edit"></i> Editar
+                    </button>
+                    <button class="btn btn-danger btn-sm delete-payment-type-button" data-id="${paymentType.id}" data-name="${paymentType.name}">
+                        <i class="fas fa-trash"></i> Deletar
+                    </button>
+                </div>
+            `;
+            elements.paymentTypesList.appendChild(li);
+        });
+    },
+
+    populatePaymentTypeSelect: (paymentTypes, currentType) => {
+        elements.paymentTypeSelect.innerHTML = '<option value="">Nenhum</option>';
+        
+        // Filtra os tipos de pagamento baseado no tipo de transação
+        const filteredPaymentTypes = paymentTypes.filter(pt => {
+            if (currentType === 'income') return pt.is_income;
+            if (currentType === 'expense') return pt.is_expense;
+            return true; // Se não especificado, mostra todos
+        });
+
+        filteredPaymentTypes.forEach(paymentType => {
+            const option = document.createElement('option');
+            option.value = paymentType.id;
+            option.textContent = paymentType.name;
+            elements.paymentTypeSelect.appendChild(option);
         });
     },
 };

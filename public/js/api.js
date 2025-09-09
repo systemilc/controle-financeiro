@@ -197,6 +197,43 @@ export const api = {
         return response.ok;
     },
 
+    // --- API DE TIPOS DE PAGAMENTO ---
+
+    fetchPaymentTypes: async () => {
+        const response = await fetch('/api/payment-types', { headers: headers() });
+        return await response.json();
+    },
+
+    createPaymentType: async (name, is_income, is_expense, is_asset) => {
+        const response = await fetch('/api/payment-types', {
+            method: 'POST',
+            headers: headers(),
+            body: JSON.stringify({ name, is_income, is_expense, is_asset }),
+        });
+        return response.ok;
+    },
+
+    editPaymentType: async (id, name, is_income, is_expense, is_asset) => {
+        const response = await fetch(`/api/payment-types/${id}`, {
+            method: 'PUT',
+            headers: headers(),
+            body: JSON.stringify({ name, is_income, is_expense, is_asset }),
+        });
+        return response.ok;
+    },
+
+    deletePaymentType: async (id) => {
+        const response = await fetch(`/api/payment-types/${id}`, {
+            method: 'DELETE',
+            headers: headers(),
+        });
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Erro ao deletar tipo de pagamento');
+        }
+        return response.ok;
+    },
+
     // --- API DE ADMINISTRAÇÃO DE USUÁRIOS ---
 
     fetchPendingUsers: async () => {

@@ -13,6 +13,7 @@ const fetchAllData = async () => {
 
         const accountsData = await api.fetchAccounts();
         const categoriesData = await api.fetchCategories(); // Busca as categorias
+        const paymentTypesData = await api.fetchPaymentTypes(); // Busca os tipos de pagamento
         
         if (Array.isArray(accountsData)) {
             state.allAccounts = accountsData;
@@ -29,6 +30,14 @@ const fetchAllData = async () => {
             render.renderCategoriesList(state.allCategories); // Renderiza a lista de categorias na página de categorias
         } else {
             console.error('Erro ao carregar categorias:', categoriesData.message);
+        }
+
+        if (Array.isArray(paymentTypesData)) {
+            state.allPaymentTypes = paymentTypesData; // Armazena os tipos de pagamento no estado
+            render.populatePaymentTypeSelect(state.allPaymentTypes, elements.typeInput.value); // Popula o select de tipos de pagamento no formulário de transação
+            render.renderPaymentTypesList(state.allPaymentTypes); // Renderiza a lista de tipos de pagamento na página de tipos de pagamento
+        } else {
+            console.error('Erro ao carregar tipos de pagamento:', paymentTypesData.message);
         }
 
         // Se estiver na página do dashboard, popular os filtros do dashboard após carregar as contas e categorias
@@ -576,6 +585,7 @@ const handleTransactionFormSubmit = async (e) => {
     const type = elements.typeInput.value;
     const account_id = elements.accountSelect.value;
     const category_id = elements.categorySelect.value || null; // Pega o ID da categoria, ou null se não selecionada
+    const payment_type_id = elements.paymentTypeSelect.value || null; // Pega o ID do tipo de pagamento, ou null se não selecionado
     const original_due_date = elements.transactionDateInput.value; // Data de vencimento base
     const multiplier = parseInt(elements.multiplierInput.value) || 1; // Valor do multiplicador
 
@@ -586,7 +596,7 @@ const handleTransactionFormSubmit = async (e) => {
 
     // Se for uma edição, ignora o multiplicador
     if (transactionId) {
-        const transactionData = { description, amount, type, account_id, due_date: original_due_date, category_id };
+        const transactionData = { description, amount, type, account_id, due_date: original_due_date, category_id, payment_type_id };
         const success = await api.editTransaction(transactionId, transactionData);
         if (success) {
             render.resetForm();
@@ -611,7 +621,8 @@ const handleTransactionFormSubmit = async (e) => {
                 type,
                 account_id,
                 due_date: current_due_date,
-                category_id
+                category_id,
+                payment_type_id
             };
 
             const success = await api.createTransaction(transactionData);
@@ -640,6 +651,8 @@ const editTransaction = async (id) => {
         elements.amountInput.value = transaction.amount;
         elements.typeInput.value = transaction.type;
         elements.accountSelect.value = transaction.account_id;
+        elements.categorySelect.value = transaction.category_id || '';
+        elements.paymentTypeSelect.value = transaction.payment_type_id || '';
         elements.transactionIdInput.value = transaction.id;
         const displayDate = transaction.due_date ? transaction.due_date : getTodayDate();
         elements.transactionDateInput.value = displayDate;
@@ -873,7 +886,7 @@ const init = () => {
 
         // Verifica se há hash na URL para navegar para a página correta
         const hash = window.location.hash.replace('#', '');
-        if (hash && ['dashboard', 'contas', 'categorias', 'transacoes', 'usuarios', 'transferencia', 'register', 'admin-users'].includes(hash)) {
+        if (hash && ['dashboard', 'contas', 'categorias', 'tipos-pagamento', 'transacoes', 'usuarios', 'transferencia', 'register', 'admin-users'].includes(hash)) {
             render.showPage(hash);
         } else {
             render.showPage('dashboard');
@@ -887,6 +900,7 @@ elements.accountForm.addEventListener('submit', handleAccountFormSubmit);
 elements.transactionForm.addEventListener('submit', handleTransactionFormSubmit);
 elements.typeInput.addEventListener('change', () => {
     render.populateCategorySelect(state.allCategories, elements.typeInput.value);
+    render.populatePaymentTypeSelect(state.allPaymentTypes, elements.typeInput.value);
 });
 elements.transferForm.addEventListener('submit', handleTransferSubmit); // Novo listener para transferência
 elements.logoutButton.addEventListener('click', logout);
@@ -1164,6 +1178,97 @@ elements.categoriesList.addEventListener('click', async (e) => {
         deleteCategory(id, name);
     } else if (target.classList.contains('edit-category-button')) {
         editCategory(id, name, type);
+    }
+});
+
+// Event listeners para tipos de pagamento
+const handlePaymentTypeFormSubmit = async (e) => {
+    e.preventDefault();
+    const paymentTypeName = elements.paymentTypeNameInput.value;
+    const isIncome = elements.paymentTypeIncomeCheckbox.checked;
+    const isExpense = elements.paymentTypeExpenseCheckbox.checked;
+    const isAsset = elements.paymentTypeAssetCheckbox.checked;
+    const paymentTypeId = elements.paymentTypeForm.dataset.editingId; // Para edição
+
+    if (!paymentTypeName) {
+        alert('Por favor, preencha o nome do tipo de pagamento.');
+        return;
+    }
+
+    if (!isIncome && !isExpense && !isAsset) {
+        alert('Por favor, selecione pelo menos uma opção (Entrada, Saída ou Ativo).');
+        return;
+    }
+
+    try {
+        let success;
+        if (paymentTypeId) {
+            success = await api.editPaymentType(paymentTypeId, paymentTypeName, isIncome, isExpense, isAsset);
+            if (success) alert('Tipo de pagamento atualizado com sucesso!');
+            elements.paymentTypeForm.removeAttribute('data-editing-id');
+        } else {
+            success = await api.createPaymentType(paymentTypeName, isIncome, isExpense, isAsset);
+            if (success) alert('Tipo de pagamento adicionado com sucesso!');
+        }
+        
+        if (success) {
+            elements.paymentTypeNameInput.value = '';
+            elements.paymentTypeIncomeCheckbox.checked = false;
+            elements.paymentTypeExpenseCheckbox.checked = false;
+            elements.paymentTypeAssetCheckbox.checked = false;
+            fetchAllData(); // Recarrega todos os tipos de pagamento
+        } else {
+            alert('Erro ao salvar tipo de pagamento. Verifique se já existe um tipo com este nome.');
+        }
+    } catch (error) {
+        console.error('Erro ao salvar tipo de pagamento:', error);
+        alert(`Erro ao salvar tipo de pagamento: ${error.message || 'Erro desconhecido'}`);
+    }
+};
+
+const deletePaymentType = async (id, name) => {
+    if (!confirm(`Tem certeza que deseja deletar o tipo de pagamento "${name}"? Isso não poderá ser desfeito.`)) return;
+
+    try {
+        const success = await api.deletePaymentType(id);
+        if (success) {
+            alert('Tipo de pagamento deletado com sucesso!');
+            fetchAllData(); // Atualiza a lista após deletar
+        } else {
+            alert('Erro ao deletar tipo de pagamento.');
+        }
+    } catch (error) {
+        console.error('Erro ao deletar tipo de pagamento:', error);
+        alert(`Erro ao deletar tipo de pagamento: ${error.message || 'Erro desconhecido'}`);
+    }
+};
+
+const editPaymentType = async (id, name, isIncome, isExpense, isAsset) => {
+    elements.paymentTypeNameInput.value = name;
+    elements.paymentTypeIncomeCheckbox.checked = isIncome == 1;
+    elements.paymentTypeExpenseCheckbox.checked = isExpense == 1;
+    elements.paymentTypeAssetCheckbox.checked = isAsset == 1;
+    elements.paymentTypeForm.dataset.editingId = id; // Armazena o ID do tipo de pagamento que está sendo editado
+    elements.paymentTypeForm.querySelector('button[type="submit"]').textContent = 'Atualizar Tipo de Pagamento';
+};
+
+elements.paymentTypeForm.addEventListener('submit', handlePaymentTypeFormSubmit);
+elements.paymentTypesList.addEventListener('click', async (e) => {
+    const target = e.target.closest('button');
+    if (!target) return;
+
+    const id = target.dataset.id;
+    const name = target.dataset.name;
+    const isIncome = target.dataset.income;
+    const isExpense = target.dataset.expense;
+    const isAsset = target.dataset.asset;
+
+    if (!id) return;
+
+    if (target.classList.contains('delete-payment-type-button')) {
+        deletePaymentType(id, name);
+    } else if (target.classList.contains('edit-payment-type-button')) {
+        editPaymentType(id, name, isIncome, isExpense, isAsset);
     }
 });
 

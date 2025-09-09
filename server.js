@@ -72,6 +72,19 @@ db.serialize(() => {
             FOREIGN KEY(group_id) REFERENCES users(group_id)
         )
     `);
+
+    db.run(`
+        CREATE TABLE IF NOT EXISTS payment_types (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            group_id INTEGER,
+            name TEXT NOT NULL,
+            is_income INTEGER DEFAULT 0, -- 1 se pode ser usado para entrada
+            is_expense INTEGER DEFAULT 0, -- 1 se pode ser usado para saída
+            is_asset INTEGER DEFAULT 0, -- 1 se é considerado ativo
+            UNIQUE(group_id, name), -- Garante que não haja tipos de pagamento duplicados por grupo
+            FOREIGN KEY(group_id) REFERENCES users(group_id)
+        )
+    `);
     
     db.run(`
         CREATE TABLE IF NOT EXISTS transactions (
@@ -79,6 +92,7 @@ db.serialize(() => {
             user_id INTEGER,
             account_id INTEGER,
             category_id INTEGER, -- Nova coluna para a categoria
+            payment_type_id INTEGER, -- Nova coluna para o tipo de pagamento
             description TEXT,
             amount REAL,
             type TEXT,
@@ -90,7 +104,8 @@ db.serialize(() => {
             is_transfer INTEGER DEFAULT 0, -- Nova coluna
             FOREIGN KEY(user_id) REFERENCES users(id),
             FOREIGN KEY(account_id) REFERENCES accounts(id),
-            FOREIGN KEY(category_id) REFERENCES categories(id)
+            FOREIGN KEY(category_id) REFERENCES categories(id),
+            FOREIGN KEY(payment_type_id) REFERENCES payment_types(id)
         )
     `);
 
@@ -118,11 +133,12 @@ db.serialize(() => {
     });
     
     // Altera a tabela de transações para adicionar as colunas se elas não existirem
-    const transactionColumns = ['original_account_name', 'is_confirmed', 'created_at', 'due_date', 'confirmed_at'];
+    const transactionColumns = ['original_account_name', 'is_confirmed', 'created_at', 'due_date', 'confirmed_at', 'payment_type_id'];
     transactionColumns.forEach(col => {
         db.all(`PRAGMA table_info(transactions)`, (err, tableInfo) => {
             if (!tableInfo || !Array.isArray(tableInfo) || !tableInfo.some(c => c.name === col)) {
-                db.run(`ALTER TABLE transactions ADD COLUMN ${col} TEXT`, (err) => {
+                const columnType = col === 'payment_type_id' ? 'INTEGER' : 'TEXT';
+                db.run(`ALTER TABLE transactions ADD COLUMN ${col} ${columnType}`, (err) => {
                     if (err) {
                         console.error(`Erro ao adicionar a coluna ${col} em transactions:`, err.message);
                     }
@@ -469,19 +485,19 @@ app.delete('/api/accounts/:id', authenticate, (req, res) => {
 });
 
 app.post('/api/transactions', authenticate, (req, res) => {
-    const { description, amount, type, account_id, due_date, is_transfer, category_id } = req.body; // Adicionado category_id
+    const { description, amount, type, account_id, due_date, is_transfer, category_id, payment_type_id } = req.body; // Adicionado payment_type_id
     const userId = req.userId;
     if (!account_id) {
         return res.status(400).json({ message: 'O ID da conta é obrigatório.' });
     }
-    db.run(`INSERT INTO transactions (user_id, account_id, description, amount, type, due_date, is_transfer, category_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [userId, account_id, description, amount, type, due_date, is_transfer ? 1 : 0, category_id || null],
+    db.run(`INSERT INTO transactions (user_id, account_id, description, amount, type, due_date, is_transfer, category_id, payment_type_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [userId, account_id, description, amount, type, due_date, is_transfer ? 1 : 0, category_id || null, payment_type_id || null],
         function (err) {
             if (err) {
                 console.error('Erro ao inserir transação no banco de dados:', err.message); // Adicionado para depuração
                 return res.status(500).json({ message: 'Erro ao adicionar transação', error: err.message });
             }
-            res.status(201).json({ id: this.lastID, description, amount, type, account_id, due_date, created_at: new Date().toISOString(), category_id });
+            res.status(201).json({ id: this.lastID, description, amount, type, account_id, due_date, created_at: new Date().toISOString(), category_id, payment_type_id });
         }
     );
 });
@@ -567,11 +583,12 @@ app.get('/api/transactions', authenticate, (req, res) => {
     }
 
     let query = `
-        SELECT t.*, a.name as account_name, u.username as creator_name, c.name as category_name, t.is_transfer
+        SELECT t.*, a.name as account_name, u.username as creator_name, c.name as category_name, pt.name as payment_type_name, t.is_transfer
         FROM transactions t
         LEFT JOIN accounts a ON t.account_id = a.id
         LEFT JOIN users u ON t.user_id = u.id
         LEFT JOIN categories c ON t.category_id = c.id
+        LEFT JOIN payment_types pt ON t.payment_type_id = pt.id
     `;
 
     if (whereClauses.length > 0) {
@@ -604,11 +621,12 @@ app.get('/api/transactions/:id', authenticate, (req, res) => {
     }
 
     const query = `
-        SELECT t.*, a.name as account_name, u.username as creator_name, c.name as category_name
+        SELECT t.*, a.name as account_name, u.username as creator_name, c.name as category_name, pt.name as payment_type_name
         FROM transactions t
         LEFT JOIN accounts a ON t.account_id = a.id
         LEFT JOIN users u ON t.user_id = u.id
         LEFT JOIN categories c ON t.category_id = c.id
+        LEFT JOIN payment_types pt ON t.payment_type_id = pt.id
         WHERE t.id = ? AND a.group_id = ?
     `;
 
@@ -626,15 +644,15 @@ app.get('/api/transactions/:id', authenticate, (req, res) => {
 
 app.put('/api/transactions/:id', authenticate, (req, res) => {
     const { id } = req.params;
-    const { description, amount, type, account_id, due_date, category_id } = req.body; // Adicionado category_id
+    const { description, amount, type, account_id, due_date, category_id, payment_type_id } = req.body; // Adicionado payment_type_id
     const userId = req.userId;
     db.run(`
         UPDATE transactions
-        SET description = ?, amount = ?, type = ?, account_id = ?, due_date = ?, category_id = ?
+        SET description = ?, amount = ?, type = ?, account_id = ?, due_date = ?, category_id = ?, payment_type_id = ?
         WHERE id = ?
           AND account_id IN (SELECT id FROM accounts WHERE group_id = ?)
     `,
-        [description, amount, type, account_id, due_date, category_id || null, id, req.groupId],
+        [description, amount, type, account_id, due_date, category_id || null, payment_type_id || null, id, req.groupId],
         function (err) {
             if (err) {
                 return res.status(500).json({ message: 'Erro ao atualizar transação', error: err.message });
@@ -765,6 +783,118 @@ app.delete('/api/categories/:id', authenticate, (req, res) => {
                 return res.status(404).json({ message: 'Categoria não encontrada ou sem permissão para deletar.' });
             }
             res.status(200).json({ message: 'Categoria deletada com sucesso!' });
+        });
+    });
+});
+
+// --- ROTAS DA API DE TIPOS DE PAGAMENTO ---
+
+// POST: Criar um novo tipo de pagamento
+app.post('/api/payment-types', authenticate, (req, res) => {
+    const { name, is_income, is_expense, is_asset } = req.body;
+    const groupId = req.groupId;
+
+    if (!name) {
+        return res.status(400).json({ message: 'Nome do tipo de pagamento é obrigatório.' });
+    }
+
+    // Valida se pelo menos um checkbox foi marcado
+    if (!is_income && !is_expense && !is_asset) {
+        return res.status(400).json({ message: 'Pelo menos uma opção (Entrada, Saída ou Ativo) deve ser selecionada.' });
+    }
+
+    db.run(`INSERT INTO payment_types (group_id, name, is_income, is_expense, is_asset) VALUES (?, ?, ?, ?, ?)`, 
+        [groupId, name, is_income ? 1 : 0, is_expense ? 1 : 0, is_asset ? 1 : 0], 
+        function(err) {
+            if (err) {
+                if (err.message.includes('UNIQUE constraint failed')) {
+                    return res.status(400).json({ message: 'Já existe um tipo de pagamento com este nome para o seu grupo.' });
+                }
+                console.error('Erro ao inserir tipo de pagamento no banco de dados:', err.message);
+                return res.status(500).json({ message: 'Erro ao criar tipo de pagamento', error: err.message });
+            }
+            res.status(201).json({ 
+                id: this.lastID, 
+                name, 
+                is_income: is_income ? 1 : 0, 
+                is_expense: is_expense ? 1 : 0, 
+                is_asset: is_asset ? 1 : 0, 
+                group_id: groupId 
+            });
+        });
+});
+
+// GET: Listar todos os tipos de pagamento do grupo do usuário
+app.get('/api/payment-types', authenticate, (req, res) => {
+    const groupId = req.groupId;
+
+    db.all(`SELECT id, name, is_income, is_expense, is_asset, group_id FROM payment_types WHERE group_id = ? ORDER BY name ASC`, [groupId], (err, rows) => {
+        if (err) {
+            console.error('Erro ao buscar tipos de pagamento no banco de dados:', err.message);
+            return res.status(500).json({ message: 'Erro ao buscar tipos de pagamento', error: err.message });
+        }
+        res.json(rows);
+    });
+});
+
+// PUT: Atualizar um tipo de pagamento
+app.put('/api/payment-types/:id', authenticate, (req, res) => {
+    const { id } = req.params;
+    const { name, is_income, is_expense, is_asset } = req.body;
+    const groupId = req.groupId;
+
+    if (!name) {
+        return res.status(400).json({ message: 'Nome do tipo de pagamento é obrigatório para atualização.' });
+    }
+
+    // Valida se pelo menos um checkbox foi marcado
+    if (!is_income && !is_expense && !is_asset) {
+        return res.status(400).json({ message: 'Pelo menos uma opção (Entrada, Saída ou Ativo) deve ser selecionada.' });
+    }
+
+    db.run(`
+        UPDATE payment_types
+        SET name = ?, is_income = ?, is_expense = ?, is_asset = ?
+        WHERE id = ? AND group_id = ?
+    `, [name, is_income ? 1 : 0, is_expense ? 1 : 0, is_asset ? 1 : 0, id, groupId], function(err) {
+        if (err) {
+            if (err.message.includes('UNIQUE constraint failed')) {
+                return res.status(400).json({ message: 'Já existe um tipo de pagamento com este nome para o seu grupo.' });
+            }
+            console.error('Erro ao atualizar tipo de pagamento no banco de dados:', err.message);
+            return res.status(500).json({ message: 'Erro ao atualizar tipo de pagamento', error: err.message });
+        }
+        if (this.changes === 0) {
+            return res.status(404).json({ message: 'Tipo de pagamento não encontrado ou sem permissão para atualizar.' });
+        }
+        res.status(200).json({ message: 'Tipo de pagamento atualizado com sucesso!' });
+    });
+});
+
+// DELETE: Deletar um tipo de pagamento
+app.delete('/api/payment-types/:id', authenticate, (req, res) => {
+    const { id } = req.params;
+    const groupId = req.groupId;
+
+    // Verifica se o tipo de pagamento está sendo usado por alguma transação
+    db.get(`SELECT COUNT(*) as count FROM transactions WHERE payment_type_id = ? AND account_id IN (SELECT id FROM accounts WHERE group_id = ?)`, [id, groupId], (err, row) => {
+        if (err) {
+            console.error('Erro ao verificar uso do tipo de pagamento:', err.message);
+            return res.status(500).json({ message: 'Erro ao verificar uso do tipo de pagamento', error: err.message });
+        }
+        if (row.count > 0) {
+            return res.status(400).json({ message: 'Não é possível deletar este tipo de pagamento. Ele está vinculado a transações existentes.' });
+        }
+
+        db.run(`DELETE FROM payment_types WHERE id = ? AND group_id = ?`, [id, groupId], function(err) {
+            if (err) {
+                console.error('Erro ao deletar tipo de pagamento no banco de dados:', err.message);
+                return res.status(500).json({ message: 'Erro ao deletar tipo de pagamento', error: err.message });
+            }
+            if (this.changes === 0) {
+                return res.status(404).json({ message: 'Tipo de pagamento não encontrado ou sem permissão para deletar.' });
+            }
+            res.status(200).json({ message: 'Tipo de pagamento deletado com sucesso!' });
         });
     });
 });
