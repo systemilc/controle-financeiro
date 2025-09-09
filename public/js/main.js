@@ -886,7 +886,7 @@ const init = () => {
 
         // Verifica se há hash na URL para navegar para a página correta
         const hash = window.location.hash.replace('#', '');
-        if (hash && ['dashboard', 'contas', 'categorias', 'tipos-pagamento', 'transacoes', 'usuarios', 'transferencia', 'register', 'admin-users'].includes(hash)) {
+        if (hash && ['dashboard', 'contas', 'categorias', 'tipos-pagamento', 'importar-compra', 'compras-importadas', 'produtos', 'transacoes', 'usuarios', 'transferencia', 'register', 'admin-users'].includes(hash)) {
             render.showPage(hash);
         } else {
             render.showPage('dashboard');
@@ -1276,6 +1276,213 @@ elements.paymentTypesList.addEventListener('click', async (e) => {
 if (elements.changePasswordModal) {
     elements.changePasswordModal.addEventListener('hidden.bs.modal', render.resetChangePasswordForm);
 }
+
+// Variáveis globais para importação
+let currentImportStep = 1;
+let importData = null;
+
+// Funções para o modal de importação (escopo global)
+window.nextImportStep = () => {
+    if (currentImportStep === 1) {
+        // Upload da planilha
+        const file = elements.spreadsheetFile.files[0];
+        if (!file) {
+            alert('Por favor, selecione um arquivo para importar.');
+            return;
+        }
+        
+        uploadSpreadsheet(file);
+    } else if (currentImportStep === 2) {
+        // Ir para configuração final
+        currentImportStep = 3;
+        render.showImportStep(3);
+        render.populateImportSelects(state.allAccounts, state.allPaymentTypes);
+        render.updateImportSummary(importData, parseInt(elements.installmentCount.value));
+    }
+};
+
+const uploadSpreadsheet = async (file) => {
+    try {
+        const result = await api.uploadSpreadsheet(file);
+        if (result.success) {
+            importData = result.data;
+            currentImportStep = 2;
+            render.showImportStep(2);
+            render.renderImportInvoices(importData);
+        } else {
+            alert('Erro ao processar planilha: ' + result.message);
+        }
+    } catch (error) {
+        console.error('Erro ao fazer upload da planilha:', error);
+        alert('Erro ao fazer upload da planilha: ' + error.message);
+    }
+};
+
+window.finalizeImport = async () => {
+    const accountId = elements.importAccountSelect.value;
+    const paymentTypeId = elements.importPaymentTypeSelect.value;
+    const installmentCount = parseInt(elements.installmentCount.value);
+    const firstInstallmentDate = elements.firstInstallmentDate.value;
+
+    if (!accountId || !paymentTypeId) {
+        alert('Por favor, selecione a conta e o tipo de pagamento.');
+        return;
+    }
+
+    try {
+        const result = await api.finalizeImport(importData, accountId, paymentTypeId, installmentCount, firstInstallmentDate);
+        if (result.success) {
+            alert(result.message);
+            // Resetar modal
+            render.resetImportModal();
+            currentImportStep = 1;
+            importData = null;
+            // Recarregar dados
+            fetchAllData();
+            // Redirecionar para a página de transações
+            render.showPage('transacoes');
+        } else {
+            alert('Erro ao finalizar importação: ' + result.message);
+        }
+    } catch (error) {
+        console.error('Erro ao finalizar importação:', error);
+        alert('Erro ao finalizar importação: ' + error.message);
+    }
+};
+
+// Event listeners para o modal de importação
+if (elements.importModal) {
+    elements.importModal.addEventListener('hidden.bs.modal', () => {
+        render.resetImportModal();
+        currentImportStep = 1;
+        importData = null;
+    });
+
+    elements.installmentCount.addEventListener('change', () => {
+        if (importData) {
+            render.updateImportSummary(importData, parseInt(elements.installmentCount.value));
+        }
+    });
+}
+
+// Funções globais para a página de produtos
+window.searchProducts = async () => {
+    const query = document.getElementById('product-search').value;
+    if (!query.trim()) {
+        loadAllProducts();
+        return;
+    }
+
+    try {
+        const products = await api.searchProducts(query);
+        render.renderProductsList(products);
+    } catch (error) {
+        console.error('Erro ao buscar produtos:', error);
+        alert('Erro ao buscar produtos: ' + error.message);
+    }
+};
+
+window.loadAllProducts = async () => {
+    try {
+        const products = await api.fetchProducts();
+        render.renderProductsList(products);
+    } catch (error) {
+        console.error('Erro ao carregar produtos:', error);
+        alert('Erro ao carregar produtos: ' + error.message);
+    }
+};
+
+window.viewProductDetails = (productId) => {
+    // Implementar modal de detalhes do produto
+    alert('Funcionalidade de detalhes do produto será implementada em breve!');
+};
+
+// Carregar produtos quando a página for exibida
+document.addEventListener('DOMContentLoaded', () => {
+    // Event listener para a página de produtos
+    const productsPage = document.getElementById('produtos-page');
+    if (productsPage) {
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+                    if (!productsPage.classList.contains('hidden')) {
+                        loadAllProducts();
+                    }
+                }
+            });
+        });
+        observer.observe(productsPage, { attributes: true });
+    }
+
+    // Event listener para a página de compras importadas
+    const purchasesPage = document.getElementById('compras-importadas-page');
+    if (purchasesPage) {
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+                    if (!purchasesPage.classList.contains('hidden')) {
+                        loadAllPurchases();
+                    }
+                }
+            });
+        });
+        observer.observe(purchasesPage, { attributes: true });
+    }
+});
+
+// Funções globais para a página de compras importadas
+window.loadAllPurchases = async () => {
+    try {
+        const purchases = await api.fetchPurchases();
+        render.renderPurchasesList(purchases);
+    } catch (error) {
+        console.error('Erro ao carregar compras:', error);
+        alert('Erro ao carregar compras: ' + error.message);
+    }
+};
+
+window.viewPurchaseDetails = async (purchaseId) => {
+    try {
+        const purchase = await api.fetchPurchaseById(purchaseId);
+        const items = await api.fetchPurchaseItems(purchaseId);
+        
+        let details = `Nota Fiscal: ${purchase.invoice_number}\n`;
+        details += `Fornecedor: ${purchase.supplier_name}\n`;
+        details += `Data: ${formatDateForDisplay(purchase.purchase_date)}\n`;
+        details += `Valor Total: R$ ${parseFloat(purchase.total_amount).toFixed(2).replace('.', ',')}\n`;
+        details += `Parcelas: ${purchase.installment_count}\n\n`;
+        details += `Itens:\n`;
+        
+        items.forEach(item => {
+            details += `• ${item.product_name} - Qtd: ${item.quantity} - Preço: R$ ${parseFloat(item.unit_price).toFixed(2).replace('.', ',')}\n`;
+        });
+        
+        alert(details);
+    } catch (error) {
+        console.error('Erro ao buscar detalhes da compra:', error);
+        alert('Erro ao buscar detalhes da compra: ' + error.message);
+    }
+};
+
+window.editPurchase = (purchaseId) => {
+    alert('Funcionalidade de edição será implementada em breve!');
+};
+
+window.deletePurchase = async (purchaseId, invoiceNumber) => {
+    if (!confirm(`Tem certeza que deseja deletar a compra da nota fiscal "${invoiceNumber}"?\n\nIsso irá:\n- Deletar a compra e todos os itens\n- Remover as transações relacionadas\n- Deletar as parcelas\n\nEsta ação não pode ser desfeita!`)) {
+        return;
+    }
+
+    try {
+        const result = await api.deletePurchase(purchaseId);
+        alert(result.message);
+        loadAllPurchases(); // Recarregar a lista
+        fetchAllData(); // Recarregar todos os dados
+    } catch (error) {
+        console.error('Erro ao deletar compra:', error);
+        alert('Erro ao deletar compra: ' + error.message);
+    }
+};
 
 // Função para coletar os valores dos filtros de transação
 const collectTransactionFilters = () => {

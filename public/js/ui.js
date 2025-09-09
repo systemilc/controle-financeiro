@@ -111,6 +111,19 @@ export const elements = {
     paymentTypesList: document.getElementById('payment-types-list'),
     paymentTypeSelect: document.getElementById('payment-type-select'), // Select de tipos de pagamento no formulário de transações
     
+    // Importação de Planilhas
+    importModal: document.getElementById('importModal'),
+    spreadsheetFile: document.getElementById('spreadsheetFile'),
+    importInvoicesList: document.getElementById('import-invoices-list'),
+    invoiceCount: document.getElementById('invoice-count'),
+    importAccountSelect: document.getElementById('import-account-select'),
+    importPaymentTypeSelect: document.getElementById('import-payment-type-select'),
+    installmentCount: document.getElementById('installment-count'),
+    firstInstallmentDate: document.getElementById('first-installment-date'),
+    importSummary: document.getElementById('import-summary'),
+    importNextBtn: document.getElementById('import-next-btn'),
+    importFinalizeBtn: document.getElementById('import-finalize-btn'),
+    
     // Filtros de Transações
     transactionFiltersForm: document.getElementById('transaction-filters-form'),
     filterDateRangeStart: document.getElementById('filter-date-range-start'),
@@ -288,6 +301,9 @@ export const render = {
             'contas': 'Contas Bancárias',
             'categorias': 'Categorias',
             'tipos-pagamento': 'Tipos de Pagamento',
+            'importar-compra': 'Importar Compra',
+            'compras-importadas': 'Compras Importadas',
+            'produtos': 'Produtos',
             'transacoes': 'Transações',
             'usuarios': 'Usuários do Grupo',
             'transferencia': 'Transferência de Saldo',
@@ -998,6 +1014,191 @@ export const render = {
             option.value = paymentType.id;
             option.textContent = paymentType.name;
             elements.paymentTypeSelect.appendChild(option);
+        });
+    },
+
+    // Importação de Planilhas
+    renderImportInvoices: (invoices) => {
+        elements.importInvoicesList.innerHTML = '';
+        elements.invoiceCount.textContent = `${invoices.length} nota(s) fiscal(is)`;
+
+        invoices.forEach(invoice => {
+            const tr = document.createElement('tr');
+            
+            // Formata a data para exibição
+            let displayDate = 'Data Inválida';
+            let dateClass = 'text-danger';
+            
+            if (invoice.purchaseDate) {
+                try {
+                    const date = new Date(invoice.purchaseDate);
+                    if (!isNaN(date.getTime())) {
+                        displayDate = date.toLocaleDateString('pt-BR');
+                        dateClass = 'text-success';
+                    } else {
+                        displayDate = invoice.purchaseDate; // Mostra o valor original
+                    }
+                } catch (e) {
+                    displayDate = invoice.purchaseDate; // Mostra o valor original
+                }
+            }
+            
+            tr.innerHTML = `
+                <td class="text-center">${invoice.invoiceNumber}</td>
+                <td class="text-start">${invoice.storeName}</td>
+                <td class="text-center ${dateClass}">${displayDate}</td>
+                <td class="text-end">R$ ${parseFloat(invoice.totalAmount).toFixed(2).replace('.', ',')}</td>
+                <td class="text-center">${invoice.items.length}</td>
+            `;
+            elements.importInvoicesList.appendChild(tr);
+        });
+    },
+
+    populateImportSelects: (accounts, paymentTypes) => {
+        // Popula select de contas
+        elements.importAccountSelect.innerHTML = '<option value="">Selecione a conta</option>';
+        accounts.forEach(account => {
+            const option = document.createElement('option');
+            option.value = account.id;
+            option.textContent = account.name;
+            elements.importAccountSelect.appendChild(option);
+        });
+
+        // Popula select de tipos de pagamento (apenas para despesas)
+        elements.importPaymentTypeSelect.innerHTML = '<option value="">Selecione o tipo</option>';
+        const expensePaymentTypes = paymentTypes.filter(pt => pt.is_expense);
+        expensePaymentTypes.forEach(paymentType => {
+            const option = document.createElement('option');
+            option.value = paymentType.id;
+            option.textContent = paymentType.name;
+            elements.importPaymentTypeSelect.appendChild(option);
+        });
+    },
+
+    updateImportSummary: (invoices, installmentCount) => {
+        const totalInvoices = invoices.length;
+        const totalAmount = invoices.reduce((sum, invoice) => sum + invoice.totalAmount, 0);
+        const totalItems = invoices.reduce((sum, invoice) => sum + invoice.items.length, 0);
+        const installmentAmount = installmentCount > 1 ? totalAmount / installmentCount : totalAmount;
+
+        elements.importSummary.innerHTML = `
+            <div><strong>${totalInvoices}</strong> nota(s) fiscal(is)</div>
+            <div><strong>${totalItems}</strong> item(ns)</div>
+            <div><strong>R$ ${parseFloat(totalAmount).toFixed(2).replace('.', ',')}</strong> total</div>
+            ${installmentCount > 1 ? `<div><strong>${installmentCount}</strong> parcelas de <strong>R$ ${parseFloat(installmentAmount).toFixed(2).replace('.', ',')}</strong></div>` : ''}
+        `;
+    },
+
+    showImportStep: (stepNumber) => {
+        // Esconde todas as etapas
+        document.querySelectorAll('.import-step').forEach(step => {
+            step.style.display = 'none';
+        });
+        
+        // Mostra a etapa atual
+        const currentStep = document.getElementById(`import-step-${stepNumber}`);
+        if (currentStep) {
+            currentStep.style.display = 'block';
+        } else {
+            console.error(`Elemento import-step-${stepNumber} não encontrado`);
+            return;
+        }
+        
+        // Atualiza botões
+        if (stepNumber === 1) {
+            elements.importNextBtn.style.display = 'inline-block';
+            elements.importFinalizeBtn.style.display = 'none';
+            elements.importNextBtn.textContent = 'Próximo';
+        } else if (stepNumber === 2) {
+            elements.importNextBtn.style.display = 'inline-block';
+            elements.importFinalizeBtn.style.display = 'none';
+            elements.importNextBtn.textContent = 'Próximo';
+        } else if (stepNumber === 3) {
+            elements.importNextBtn.style.display = 'none';
+            elements.importFinalizeBtn.style.display = 'inline-block';
+        }
+    },
+
+    resetImportModal: () => {
+        elements.spreadsheetFile.value = '';
+        elements.importInvoicesList.innerHTML = '';
+        elements.invoiceCount.textContent = '0 notas fiscais';
+        elements.importAccountSelect.value = '';
+        elements.importPaymentTypeSelect.value = '';
+        elements.installmentCount.value = '1';
+        elements.firstInstallmentDate.value = '';
+        elements.importSummary.textContent = '-';
+        render.showImportStep(1);
+    },
+
+    // Produtos
+    renderProductsList: (products) => {
+        const productsList = document.getElementById('products-list');
+        if (!productsList) return;
+
+        productsList.innerHTML = '';
+        
+        if (!products || products.length === 0) {
+            productsList.innerHTML = '<tr><td colspan="8" class="text-center text-muted">Nenhum produto encontrado.</td></tr>';
+            return;
+        }
+
+        products.forEach(product => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="text-start">${product.name}</td>
+                <td class="text-center">${product.code || 'N/A'}</td>
+                <td class="text-start">${product.suppliers || 'N/A'}</td>
+                <td class="text-end">R$ ${product.last_price || '0,00'}</td>
+                <td class="text-center">${product.total_quantity || 0}</td>
+                <td class="text-end">R$ ${product.average_price || '0,00'}</td>
+                <td class="text-center">${product.last_purchase || 'N/A'}</td>
+                <td class="text-center">
+                    <button class="btn btn-sm btn-info" onclick="viewProductDetails(${product.id})" title="Ver Detalhes">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </td>
+            `;
+            productsList.appendChild(tr);
+        });
+    },
+
+    // Compras Importadas
+    renderPurchasesList: (purchases) => {
+        const purchasesList = document.getElementById('purchases-list');
+        if (!purchasesList) return;
+
+        purchasesList.innerHTML = '';
+        
+        if (!purchases || purchases.length === 0) {
+            purchasesList.innerHTML = '<tr><td colspan="9" class="text-center text-muted">Nenhuma compra importada encontrada.</td></tr>';
+            return;
+        }
+
+        purchases.forEach(purchase => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="text-center">${purchase.invoice_number}</td>
+                <td class="text-start">${purchase.supplier_name || 'N/A'}</td>
+                <td class="text-center">${formatDateForDisplay(purchase.purchase_date)}</td>
+                <td class="text-end">R$ ${parseFloat(purchase.total_amount).toFixed(2).replace('.', ',')}</td>
+                <td class="text-center">${purchase.installment_count || 1}</td>
+                <td class="text-center">${purchase.items_count || 0}</td>
+                <td class="text-start">${purchase.account_name || 'N/A'}</td>
+                <td class="text-start">${purchase.payment_type_name || 'N/A'}</td>
+                <td class="text-center">
+                    <button class="btn btn-sm btn-info me-1" onclick="viewPurchaseDetails(${purchase.id})" title="Ver Detalhes">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    <button class="btn btn-sm btn-warning me-1" onclick="editPurchase(${purchase.id})" title="Editar">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-sm btn-danger" onclick="deletePurchase(${purchase.id}, '${purchase.invoice_number}')" title="Deletar">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            `;
+            purchasesList.appendChild(tr);
         });
     },
 };

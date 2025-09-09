@@ -209,6 +209,20 @@ header {
     padding: 0 10px; /* Padding horizontal sutil */
 }
 
+/* Estilos para o modal de importação */
+.import-step {
+    min-height: 300px;
+}
+
+#import-invoices-list {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+#import-summary {
+    font-size: 0.9rem;
+}
+
 .page-content.hidden {
     display: none;
 }
@@ -500,4 +514,74 @@ header {
 .container-fluid {
     padding-left: 15px;
     padding-right: 15px;
+}
+
+/* Melhorias para tabelas */
+.table th {
+    white-space: nowrap;
+    vertical-align: middle;
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+.table td {
+    vertical-align: middle;
+    font-size: 0.875rem;
+}
+
+.table-sm th,
+.table-sm td {
+    padding: 0.5rem 0.75rem;
+}
+
+/* Ajustes específicos para colunas de valores */
+.text-end {
+    text-align: right !important;
+}
+
+.text-center {
+    text-align: center !important;
+}
+
+.text-start {
+    text-align: left !important;
+}
+
+/* Garantir que as colunas mantenham suas larguras */
+.table th[style*="width"],
+.table td[style*="width"] {
+    min-width: 0;
+    max-width: none;
+}
+
+/* Ajustes para responsividade das tabelas */
+@media (max-width: 768px) {
+    .table-responsive {
+        font-size: 0.8rem;
+    }
+    
+    .table th,
+    .table td {
+        padding: 0.25rem 0.5rem;
+    }
+    
+    .table th[style*="width"],
+    .table td[style*="width"] {
+        width: auto !important;
+    }
+}
+
+/* Garantir que o campo de data da primeira parcela seja visível */
+#first-installment-date {
+    display: block !important;
+    visibility: visible !important;
+}
+
+/* Ajustes para o modal de importação */
+.import-step {
+    min-height: 300px;
+}
+
+.import-step .col-md-4 {
+    margin-bottom: 1rem;
 }

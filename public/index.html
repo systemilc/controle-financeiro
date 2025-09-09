@@ -144,6 +144,24 @@
                     </a>
                 </li>
                 <li class="nav-item">
+                    <a class="nav-link" href="#importar-compra" data-page="importar-compra">
+                        <i class="fas fa-file-excel me-2"></i>
+                        <span class="nav-text">Importar Compra</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#compras-importadas" data-page="compras-importadas">
+                        <i class="fas fa-receipt me-2"></i>
+                        <span class="nav-text">Compras Importadas</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#produtos" data-page="produtos">
+                        <i class="fas fa-box me-2"></i>
+                        <span class="nav-text">Produtos</span>
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a class="nav-link" href="#transacoes" data-page="transacoes">
                         <i class="fas fa-exchange-alt me-2"></i>
                         <span class="nav-text">Transações</span>
@@ -422,14 +440,231 @@
                     </div>
                 </div>
 
+                <!-- Importar Compra -->
+                <div id="importar-compra-page" class="page-content hidden">
+                    <div class="row">
+                        <div class="col-12 mb-4">
+                            <div class="card p-3 shadow-sm">
+                                <div class="text-center mb-4">
+                                    <i class="fas fa-file-excel fa-3x text-success mb-3"></i>
+                                    <h2 class="text-primary">Importar Compra de Supermercado</h2>
+                                    <p class="text-muted">Faça upload de uma planilha Excel (.xlsx, .xls) ou CSV com os dados das compras</p>
+                                </div>
+                                
+                                <!-- Etapa 1: Upload da Planilha -->
+                                <div id="import-step-1" class="import-step">
+                                    <div class="mb-3">
+                                        <label for="spreadsheetFile" class="form-label">Arquivo da Planilha:</label>
+                                        <input type="file" class="form-control" id="spreadsheetFile" accept=".xlsx,.xls,.csv">
+                                        <div class="form-text">Formatos aceitos: .xlsx, .xls, .csv</div>
+                                    </div>
+                                    <div class="alert alert-info">
+                                        <h6><i class="fas fa-info-circle"></i> Colunas Obrigatórias:</h6>
+                                        <ul class="mb-0">
+                                            <li><strong>numero_nota:</strong> Número da nota fiscal</li>
+                                            <li><strong>nome_loja:</strong> Nome da loja/fornecedor</li>
+                                            <li><strong>codigo_produto:</strong> Código do produto</li>
+                                            <li><strong>nome_produto:</strong> Nome do produto</li>
+                                            <li><strong>quantidade:</strong> Quantidade comprada</li>
+                                            <li><strong>valor_unitario:</strong> Valor unitário</li>
+                                            <li><strong>total:</strong> Valor total do item</li>
+                                            <li><strong>data_compra:</strong> Data da compra</li>
+                                        </ul>
+                                    </div>
+                                    <div class="text-center">
+                                        <button class="btn btn-primary btn-lg" onclick="nextImportStep()">
+                                            <i class="fas fa-upload"></i> Processar Planilha
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Etapa 2: Visualização dos Dados -->
+                                <div id="import-step-2" class="import-step" style="display: none;">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <h4>Dados da Planilha</h4>
+                                        <span class="badge bg-primary" id="invoice-count">0 notas fiscais</span>
+                                    </div>
+                                    <div class="table-responsive" style="max-height: 400px;">
+                                        <table class="table table-sm table-striped">
+                                            <thead class="table-dark sticky-top">
+                                                <tr>
+                                                    <th class="text-center" style="width: 10%;">Nota</th>
+                                                    <th class="text-start" style="width: 30%;">Loja</th>
+                                                    <th class="text-center" style="width: 15%;">Data</th>
+                                                    <th class="text-end" style="width: 20%;">Total</th>
+                                                    <th class="text-center" style="width: 10%;">Itens</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="import-invoices-list">
+                                                <!-- Dados serão inseridos via JavaScript -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div class="text-center mt-3">
+                                        <button class="btn btn-success btn-lg" onclick="nextImportStep()">
+                                            <i class="fas fa-arrow-right"></i> Configurar Importação
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Etapa 3: Configuração Final -->
+                                <div id="import-step-3" class="import-step" style="display: none;">
+                                    <h4>Configuração Final</h4>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="import-account-select" class="form-label">Conta Bancária:</label>
+                                                <select class="form-select" id="import-account-select" required>
+                                                    <option value="">Selecione a conta</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="import-payment-type-select" class="form-label">Tipo de Pagamento:</label>
+                                                <select class="form-select" id="import-payment-type-select" required>
+                                                    <option value="">Selecione o tipo</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label for="installment-count" class="form-label">Número de Parcelas:</label>
+                                                <select class="form-select" id="installment-count">
+                                                    <option value="1">À vista (1 parcela)</option>
+                                                    <option value="2">2 parcelas</option>
+                                                    <option value="3">3 parcelas</option>
+                                                    <option value="4">4 parcelas</option>
+                                                    <option value="5">5 parcelas</option>
+                                                    <option value="6">6 parcelas</option>
+                                                    <option value="12">12 parcelas</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label for="first-installment-date" class="form-label">Data da Primeira Parcela:</label>
+                                                <input type="date" class="form-control" id="first-installment-date">
+                                                <div class="form-text">Deixe em branco para usar a data da compra</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label class="form-label">Resumo da Importação:</label>
+                                                <div class="card bg-light">
+                                                    <div class="card-body py-2">
+                                                        <small class="text-muted">
+                                                            <div id="import-summary">-</div>
+                                                        </small>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="text-center mt-3">
+                                        <button class="btn btn-success btn-lg" onclick="finalizeImport()">
+                                            <i class="fas fa-check"></i> Finalizar Importação
+                                        </button>
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Compras Importadas -->
+                <div id="compras-importadas-page" class="page-content hidden">
+                    <div class="row">
+                        <div class="col-12 mb-4">
+                            <div class="card p-3 shadow-sm">
+                                <h2 class="text-primary">Compras Importadas</h2>
+                                <p class="text-muted">Gerencie as compras importadas das planilhas</p>
+                                
+                                <!-- Lista de Compras -->
+                                <div class="table-responsive">
+                                    <table class="table table-hover table-striped table-sm">
+                                        <thead class="table-dark">
+                                            <tr>
+                                                <th class="text-center" style="width: 8%;">Nota Fiscal</th>
+                                                <th class="text-start" style="width: 20%;">Fornecedor</th>
+                                                <th class="text-center" style="width: 10%;">Data Compra</th>
+                                                <th class="text-end" style="width: 12%;">Valor Total</th>
+                                                <th class="text-center" style="width: 6%;">Parcelas</th>
+                                                <th class="text-center" style="width: 6%;">Itens</th>
+                                                <th class="text-start" style="width: 15%;">Conta</th>
+                                                <th class="text-start" style="width: 15%;">Tipo Pagamento</th>
+                                                <th class="text-center" style="width: 8%;">Ações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="purchases-list">
+                                            <!-- Compras serão inseridas via JavaScript -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Produtos -->
+                <div id="produtos-page" class="page-content hidden">
+                    <div class="row">
+                        <div class="col-12 mb-4">
+                            <div class="card p-3 shadow-sm">
+                                <h2 class="text-primary">Gerenciar Produtos</h2>
+                                <p class="text-muted">Visualize e gerencie os produtos importados das compras</p>
+                                
+                                <!-- Filtros -->
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <input type="text" class="form-control" id="product-search" placeholder="Buscar produtos por nome ou código...">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <button class="btn btn-primary" onclick="searchProducts()">
+                                            <i class="fas fa-search"></i> Buscar
+                                        </button>
+                                        <button class="btn btn-secondary" onclick="loadAllProducts()">
+                                            <i class="fas fa-list"></i> Ver Todos
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Lista de Produtos -->
+                                <div class="table-responsive">
+                                    <table class="table table-hover table-striped table-sm">
+                                        <thead class="table-dark">
+                                            <tr>
+                                                <th class="text-start" style="width: 25%;">Nome</th>
+                                                <th class="text-center" style="width: 10%;">Código</th>
+                                                <th class="text-start" style="width: 15%;">Fornecedores</th>
+                                                <th class="text-end" style="width: 12%;">Preço Última Compra</th>
+                                                <th class="text-center" style="width: 8%;">Quantidade Total</th>
+                                                <th class="text-end" style="width: 12%;">Preço Médio</th>
+                                                <th class="text-center" style="width: 10%;">Última Compra</th>
+                                                <th class="text-center" style="width: 8%;">Ações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="products-list">
+                                            <!-- Produtos serão inseridos via JavaScript -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Transações -->
                 <div id="transacoes-page" class="page-content hidden">
                     <!-- Seção Adicionar Transação (agora no topo) -->
                     <div class="row">
                         <div class="col-12 mb-4">
                             <div class="card p-3 shadow-sm">
+                                <h2 id="form-title" class="text-primary">Adicionar Transação</h2>
                                 <form id="transaction-form">
-                                    <h2 id="form-title" class="text-primary">Adicionar Transação</h2>
                                     <input type="hidden" id="transaction-id">
                                     <div class="row g-3">
                                         <div class="col-md-6">
@@ -795,6 +1030,35 @@
                     <button type="submit" class="btn btn-primary w-100">Salvar Nova Senha</button>
                     <p id="change-password-error-message" class="text-danger text-center mt-3 hidden"></p>
                 </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Importação de Planilhas -->
+<div class="modal fade" id="importModal" tabindex="-1" aria-labelledby="importModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="importModalLabel">Importar Planilha de Compras</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Modal desabilitado - use a página de importação -->
+                <div class="text-center">
+                    <i class="fas fa-info-circle fa-3x text-info mb-3"></i>
+                    <h4>Modal de Importação Desabilitado</h4>
+                    <p class="text-muted">Use a página "Importar Compra" no menu lateral para fazer upload das planilhas.</p>
+                    <button class="btn btn-primary" onclick="render.showPage('importar-compra')">
+                        <i class="fas fa-arrow-right"></i> Ir para Página de Importação
+                    </button>
+                </div>
+
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="import-next-btn" onclick="nextImportStep()">Próximo</button>
+                <button type="button" class="btn btn-success" id="import-finalize-btn" onclick="finalizeImport()" style="display: none;">Finalizar Importação</button>
             </div>
         </div>
     </div>

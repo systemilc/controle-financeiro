@@ -256,4 +256,108 @@ export const api = {
         }
         return response.ok;
     },
+
+    // --- API DE FORNECEDORES ---
+
+    fetchSuppliers: async () => {
+        const response = await fetch('/api/suppliers', { headers: headers() });
+        return await response.json();
+    },
+
+    createSupplier: async (name) => {
+        const response = await fetch('/api/suppliers', {
+            method: 'POST',
+            headers: headers(),
+            body: JSON.stringify({ name }),
+        });
+        return response.ok;
+    },
+
+    // --- API DE PRODUTOS ---
+
+    fetchProducts: async () => {
+        const response = await fetch('/api/products', { headers: headers() });
+        return await response.json();
+    },
+
+    searchProducts: async (query) => {
+        const response = await fetch(`/api/products/search?q=${encodeURIComponent(query)}`, { headers: headers() });
+        return await response.json();
+    },
+
+    createProduct: async (name, code) => {
+        const response = await fetch('/api/products', {
+            method: 'POST',
+            headers: headers(),
+            body: JSON.stringify({ name, code }),
+        });
+        return response.ok;
+    },
+
+    // --- API DE IMPORTAÇÃO ---
+
+    uploadSpreadsheet: async (file) => {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await fetch('/api/import/spreadsheet', {
+            method: 'POST',
+            headers: {
+                'X-User-Id': localStorage.getItem('userId'),
+                'X-Group-Id': localStorage.getItem('groupId'),
+                'X-User-Role': localStorage.getItem('userRole')
+            },
+            body: formData
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Erro ao fazer upload da planilha.');
+        }
+        return await response.json();
+    },
+
+    finalizeImport: async (invoices, accountId, paymentTypeId, installmentCount, firstInstallmentDate) => {
+        const response = await fetch('/api/import/finalize', {
+            method: 'POST',
+            headers: headers(),
+            body: JSON.stringify({ invoices, accountId, paymentTypeId, installmentCount, firstInstallmentDate }),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Erro ao finalizar importação.');
+        }
+        return await response.json();
+    },
+
+    // --- API DE COMPRAS IMPORTADAS ---
+
+    fetchPurchases: async () => {
+        const response = await fetch('/api/purchases', { headers: headers() });
+        return await response.json();
+    },
+
+    fetchPurchaseById: async (id) => {
+        const response = await fetch(`/api/purchases/${id}`, { headers: headers() });
+        return await response.json();
+    },
+
+    fetchPurchaseItems: async (id) => {
+        const response = await fetch(`/api/purchases/${id}/items`, { headers: headers() });
+        return await response.json();
+    },
+
+    deletePurchase: async (id) => {
+        const response = await fetch(`/api/purchases/${id}`, {
+            method: 'DELETE',
+            headers: headers(),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Erro ao deletar compra.');
+        }
+        return await response.json();
+    },
 };
