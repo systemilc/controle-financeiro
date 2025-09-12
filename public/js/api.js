@@ -285,6 +285,11 @@ export const api = {
         return await response.json();
     },
 
+    getAllProducts: async () => {
+        const response = await fetch('/api/products', { headers: headers() });
+        return await response.json();
+    },
+
     createProduct: async (name, code) => {
         const response = await fetch('/api/products', {
             method: 'POST',
@@ -317,11 +322,11 @@ export const api = {
         return await response.json();
     },
 
-    finalizeImport: async (invoices, accountId, paymentTypeId, installmentCount, firstInstallmentDate) => {
+    finalizeImport: async (invoices, accountId, paymentTypeId, categoryId, installmentCount, firstInstallmentDate) => {
         const response = await fetch('/api/import/finalize', {
             method: 'POST',
             headers: headers(),
-            body: JSON.stringify({ invoices, accountId, paymentTypeId, installmentCount, firstInstallmentDate }),
+            body: JSON.stringify({ invoices, accountId, paymentTypeId, categoryId, installmentCount, firstInstallmentDate }),
         });
 
         if (!response.ok) {

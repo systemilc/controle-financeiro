@@ -118,6 +118,7 @@ export const elements = {
     invoiceCount: document.getElementById('invoice-count'),
     importAccountSelect: document.getElementById('import-account-select'),
     importPaymentTypeSelect: document.getElementById('import-payment-type-select'),
+    importCategorySelect: document.getElementById('import-category-select'),
     installmentCount: document.getElementById('installment-count'),
     firstInstallmentDate: document.getElementById('first-installment-date'),
     importSummary: document.getElementById('import-summary'),
@@ -1052,9 +1053,138 @@ export const render = {
             `;
             elements.importInvoicesList.appendChild(tr);
         });
+
+        // Renderizar produtos para associação
+        console.log('Chamando renderImportProducts com invoices:', invoices);
+        render.renderImportProducts(invoices);
     },
 
-    populateImportSelects: (accounts, paymentTypes) => {
+    renderImportProducts: (invoices) => {
+        console.log('renderImportProducts chamada com:', invoices);
+        const productsList = document.getElementById('import-products-list');
+        console.log('Elemento productsList encontrado:', productsList);
+        
+        if (!productsList) {
+            console.error('Elemento import-products-list não encontrado!');
+            return;
+        }
+
+        productsList.innerHTML = '';
+        
+        // Coletar todos os produtos únicos das notas fiscais
+        const allProducts = new Map();
+        console.log('Processando invoices:', invoices.length);
+        
+        // Armazenar produtos globalmente para acesso posterior
+        window.currentImportProducts = {};
+        
+        invoices.forEach((invoice, invoiceIndex) => {
+            console.log(`Invoice ${invoiceIndex}:`, invoice);
+            if (invoice.items && invoice.items.length > 0) {
+                invoice.items.forEach((item, itemIndex) => {
+                    console.log(`Item ${itemIndex}:`, item);
+                    const key = `${item.productCode}-${item.productName}`;
+                    if (!allProducts.has(key)) {
+                        allProducts.set(key, {
+                            name: item.productName,
+                            code: item.productCode,
+                            unitPrice: item.unitPrice,
+                            quantity: item.quantity,
+                            suppliers: new Set([invoice.storeName]),
+                            storeName: invoice.storeName,
+                            purchaseDate: invoice.purchaseDate,
+                            invoiceNumber: invoice.invoiceNumber
+                        });
+                    } else {
+                        const existing = allProducts.get(key);
+                        existing.suppliers.add(invoice.storeName);
+                        existing.quantity += item.quantity;
+                    }
+                });
+            } else {
+                console.log(`Invoice ${invoiceIndex} não tem items:`, invoice);
+            }
+        });
+        
+        console.log('Produtos únicos coletados:', allProducts.size);
+
+        // Renderizar produtos
+        let index = 1;
+        console.log('Iniciando renderização de produtos...');
+        
+        allProducts.forEach((product, key) => {
+            console.log(`Renderizando produto ${index}:`, product);
+            const tr = document.createElement('tr');
+            const safeKey = `product_${index}_${key.replace(/[^a-zA-Z0-9]/g, '_')}`;
+            
+            // Armazenar dados do produto para uso posterior
+            window.currentImportProducts[safeKey] = {
+                ...product,
+                suppliers: Array.from(product.suppliers || [])
+            };
+            
+            tr.innerHTML = `
+                <td class="text-center">${index++}</td>
+                <td class="text-start">${product.name}</td>
+                <td class="text-center">${product.code}</td>
+                <td class="text-end">R$ ${parseFloat(product.unitPrice).toFixed(2).replace('.', ',')}</td>
+                <td class="text-center">${product.quantity}</td>
+                <td class="text-start">
+                    <div class="input-group input-group-sm">
+                        <select class="form-select" id="associate-${safeKey}" 
+                                style="max-height: 200px; font-size: 0.875rem;"
+                                onchange="showProductComparison('${safeKey}', this.value)">
+                            <option value="">Novo produto</option>
+                        </select>
+                        <button class="btn btn-outline-secondary" type="button" 
+                                onclick="loadAllProductsForSelect('${safeKey}')"
+                                title="Carregar todos os produtos">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                    </div>
+                </td>
+                <td class="text-center">
+                    <button class="btn btn-sm btn-outline-primary search-product-btn" 
+                            data-key="${safeKey}" 
+                            data-name="${product.name.replace(/"/g, '&quot;')}" 
+                            data-code="${product.code.replace(/"/g, '&quot;')}">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </td>
+            `;
+            productsList.appendChild(tr);
+            console.log(`Produto ${index-1} adicionado à tabela`);
+        });
+        
+        console.log(`Total de produtos renderizados: ${allProducts.size}`);
+
+        // Carregar automaticamente todos os produtos nos selects
+        setTimeout(() => {
+            let index = 1;
+            allProducts.forEach((product, key) => {
+                const safeKey = `product_${index}_${key.replace(/[^a-zA-Z0-9]/g, '_')}`;
+                loadAllProductsForSelect(safeKey);
+                index++;
+            });
+        }, 200);
+
+        // Adicionar event listeners para os botões de busca
+        setTimeout(() => {
+            const searchButtons = productsList.querySelectorAll('.search-product-btn');
+            searchButtons.forEach(button => {
+                button.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const key = button.getAttribute('data-key');
+                    const name = button.getAttribute('data-name');
+                    const code = button.getAttribute('data-code');
+                    console.log('Botão clicado:', { key, name, code });
+                    window.searchExistingProducts(key, name, code);
+                });
+            });
+        }, 100);
+    },
+
+    populateImportSelects: (accounts, paymentTypes, categories) => {
         // Popula select de contas
         elements.importAccountSelect.innerHTML = '<option value="">Selecione a conta</option>';
         accounts.forEach(account => {
@@ -1073,6 +1203,18 @@ export const render = {
             option.textContent = paymentType.name;
             elements.importPaymentTypeSelect.appendChild(option);
         });
+
+        // Popula select de categorias (apenas para despesas)
+        elements.importCategorySelect.innerHTML = '<option value="">Selecione a categoria</option>';
+        if (categories) {
+            const expenseCategories = categories.filter(cat => cat.type === 'expense');
+            expenseCategories.forEach(category => {
+                const option = document.createElement('option');
+                option.value = category.id;
+                option.textContent = category.name;
+                elements.importCategorySelect.appendChild(option);
+            });
+        }
     },
 
     updateImportSummary: (invoices, installmentCount) => {
@@ -1125,13 +1267,14 @@ export const render = {
         elements.invoiceCount.textContent = '0 notas fiscais';
         elements.importAccountSelect.value = '';
         elements.importPaymentTypeSelect.value = '';
+        elements.importCategorySelect.value = '';
         elements.installmentCount.value = '1';
         elements.firstInstallmentDate.value = '';
         elements.importSummary.textContent = '-';
         render.showImportStep(1);
     },
 
-    showProductDetailsModal: (product, purchaseHistory) => {
+    showProductDetailsModal: (product, purchaseHistory, associatedProducts = []) => {
         // Preencher informações básicas
         document.getElementById('product-name').textContent = product.name;
         document.getElementById('product-code').textContent = product.code;
@@ -1144,6 +1287,35 @@ export const render = {
         document.getElementById('product-last-price').textContent = `R$ ${product.last_price}`;
         document.getElementById('product-last-purchase').textContent = product.last_purchase;
 
+        // Preencher melhor fornecedor
+        const bestSupplierSection = document.getElementById('best-supplier-section');
+        if (product.min_price_supplier) {
+            document.getElementById('best-supplier-name').textContent = product.min_price_supplier.name;
+            document.getElementById('best-supplier-price').textContent = `R$ ${product.min_price_supplier.price}`;
+            document.getElementById('best-supplier-date').textContent = product.min_price_supplier.date;
+            bestSupplierSection.style.display = 'block';
+        } else {
+            bestSupplierSection.style.display = 'none';
+        }
+
+        // Mostrar produtos associados se existirem
+        const associatedProductsSection = document.getElementById('associated-products-section');
+        if (associatedProducts && associatedProducts.length > 0) {
+            const associatedProductsList = document.getElementById('associated-products-list');
+            associatedProductsList.innerHTML = '';
+            
+            associatedProducts.forEach(associatedProduct => {
+                const item = document.createElement('div');
+                item.className = 'badge bg-info me-2 mb-2';
+                item.textContent = `${associatedProduct.name} (${associatedProduct.code})`;
+                associatedProductsList.appendChild(item);
+            });
+            
+            associatedProductsSection.style.display = 'block';
+        } else {
+            associatedProductsSection.style.display = 'none';
+        }
+
         // Preencher histórico de compras
         const historyTable = document.getElementById('product-purchase-history');
         const noHistoryDiv = document.getElementById('no-purchase-history');
@@ -1155,8 +1327,13 @@ export const render = {
             
             purchaseHistory.forEach(item => {
                 const tr = document.createElement('tr');
+                const isAssociatedProduct = item.product_name && item.product_name !== product.name;
+                const productInfo = isAssociatedProduct ? 
+                    `<span class="badge bg-info me-1">${item.product_name}</span>` : 
+                    '';
+                
                 tr.innerHTML = `
-                    <td class="text-center">${item.invoice_number}</td>
+                    <td class="text-center">${productInfo}${item.invoice_number}</td>
                     <td class="text-start">${item.supplier_name}</td>
                     <td class="text-center">${item.purchase_date}</td>
                     <td class="text-center">${item.quantity}</td>

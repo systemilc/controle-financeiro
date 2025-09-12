@@ -499,19 +499,47 @@
                                                 <!-- Dados serão inseridos via JavaScript -->
                                             </tbody>
                                         </table>
+                                </div>
+                                
+                                <!-- Lista de Produtos para Associação -->
+                                <div class="mt-4">
+                                    <h5><i class="fas fa-boxes me-2"></i>Produtos Encontrados</h5>
+                                    <div class="alert alert-info">
+                                        <i class="fas fa-info-circle me-2"></i>
+                                        Se algum produto já existe no sistema, você pode associá-lo para comparar preços entre fornecedores.
                                     </div>
-                                    <div class="text-center mt-3">
-                                        <button class="btn btn-success btn-lg" onclick="nextImportStep()">
-                                            <i class="fas fa-arrow-right"></i> Configurar Importação
-                                        </button>
+                                    <div class="table-responsive" style="max-height: 300px;">
+                                        <table class="table table-sm table-striped">
+                                            <thead class="table-dark sticky-top">
+                                                <tr>
+                                                    <th class="text-center" style="width: 5%;">#</th>
+                                                    <th class="text-start" style="width: 25%;">Produto</th>
+                                                    <th class="text-center" style="width: 15%;">Código</th>
+                                                    <th class="text-end" style="width: 12%;">Preço</th>
+                                                    <th class="text-center" style="width: 10%;">Qtd</th>
+                                                    <th class="text-start" style="width: 20%;">Associar a Produto Existente</th>
+                                                    <th class="text-center" style="width: 13%;">Ações</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="import-products-list">
+                                                <!-- Produtos serão inseridos via JavaScript -->
+                                            </tbody>
+                                        </table>
                                     </div>
+                                </div>
+                                
+                                <div class="text-center mt-3">
+                                    <button class="btn btn-success btn-lg" onclick="nextImportStep()">
+                                        <i class="fas fa-arrow-right"></i> Configurar Importação
+                                    </button>
+                                </div>
                                 </div>
 
                                 <!-- Etapa 3: Configuração Final -->
                                 <div id="import-step-3" class="import-step" style="display: none;">
                                     <h4>Configuração Final</h4>
                                     <div class="row">
-                                        <div class="col-md-6">
+                                        <div class="col-md-4">
                                             <div class="mb-3">
                                                 <label for="import-account-select" class="form-label">Conta Bancária:</label>
                                                 <select class="form-select" id="import-account-select" required>
@@ -519,11 +547,19 @@
                                                 </select>
                                             </div>
                                         </div>
-                                        <div class="col-md-6">
+                                        <div class="col-md-4">
                                             <div class="mb-3">
                                                 <label for="import-payment-type-select" class="form-label">Tipo de Pagamento:</label>
                                                 <select class="form-select" id="import-payment-type-select" required>
                                                     <option value="">Selecione o tipo</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label for="import-category-select" class="form-label">Categoria:</label>
+                                                <select class="form-select" id="import-category-select" required>
+                                                    <option value="">Selecione a categoria</option>
                                                 </select>
                                             </div>
                                         </div>
@@ -720,6 +756,46 @@
                                             <div class="card-body">
                                                 <h5 class="card-title text-warning" id="product-last-purchase">N/A</h5>
                                                 <p class="card-text">Última Compra</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Melhor Fornecedor -->
+                                <div class="row mb-4" id="best-supplier-section" style="display: none;">
+                                    <div class="col-12">
+                                        <div class="card border-success">
+                                            <div class="card-header bg-success text-white">
+                                                <h6 class="mb-0"><i class="fas fa-trophy me-2"></i>Melhor Fornecedor</h6>
+                                            </div>
+                                            <div class="card-body">
+                                                <div class="row align-items-center">
+                                                    <div class="col-md-8">
+                                                        <h5 class="text-success mb-1" id="best-supplier-name">-</h5>
+                                                        <p class="text-muted mb-0">Menor preço encontrado</p>
+                                                    </div>
+                                                    <div class="col-md-4 text-end">
+                                                        <h4 class="text-success mb-0" id="best-supplier-price">R$ 0,00</h4>
+                                                        <small class="text-muted" id="best-supplier-date">-</small>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Produtos Associados -->
+                                <div class="row mb-4" id="associated-products-section" style="display: none;">
+                                    <div class="col-12">
+                                        <div class="card border-info">
+                                            <div class="card-header bg-info text-white">
+                                                <h6 class="mb-0"><i class="fas fa-link me-2"></i>Produtos Associados</h6>
+                                            </div>
+                                            <div class="card-body">
+                                                <p class="text-muted mb-2">Este produto está associado aos seguintes produtos e compartilha o histórico de compras:</p>
+                                                <div id="associated-products-list">
+                                                    <!-- Produtos associados serão inseridos via JavaScript -->
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -1170,6 +1246,117 @@
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                 <button type="button" class="btn btn-primary" id="import-next-btn" onclick="nextImportStep()">Próximo</button>
                 <button type="button" class="btn btn-success" id="import-finalize-btn" onclick="finalizeImport()" style="display: none;">Finalizar Importação</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Comparação de Produtos -->
+<div class="modal fade" id="productComparisonModal" tabindex="-1" aria-labelledby="productComparisonModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="productComparisonModalLabel">Unificação de Produtos</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info mb-3">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Unificação de Produtos:</strong> Ao confirmar, os dois produtos serão unificados em um único produto,
+                    mantendo o histórico de compras de ambos e combinando todos os fornecedores. O produto secundário será removido.
+                </div>
+                
+                <!-- Informação sobre unificação -->
+                <div class="mb-4">
+                    <div class="alert alert-warning">
+                        <h6><i class="fas fa-info-circle me-2"></i>Unificação de Produtos</h6>
+                        <p class="mb-0">
+                            <strong>O produto existente será mantido</strong> e receberá todo o estoque e histórico de compras do produto importado. 
+                            O produto importado será removido após a unificação.
+                        </p>
+                    </div>
+                </div>
+                <div class="row">
+                    <!-- Produto da Planilha -->
+                    <div class="col-md-6">
+                        <div class="card border-primary">
+                            <div class="card-header bg-primary text-white">
+                                <h6 class="mb-0"><i class="fas fa-file-excel me-2"></i>Produto da Planilha</h6>
+                            </div>
+                            <div class="card-body">
+                                <h5 id="import-product-name" class="text-primary"></h5>
+                                <p><strong>Código:</strong> <span id="import-product-code"></span></p>
+                                <p><strong>Preço:</strong> <span id="import-product-price"></span></p>
+                                <p><strong>Quantidade:</strong> <span id="import-product-quantity"></span></p>
+                                <p><strong>Fornecedor:</strong> <span id="import-product-supplier"></span></p>
+                                <p><strong>Data:</strong> <span id="import-product-date"></span></p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Produto Existente -->
+                    <div class="col-md-6">
+                        <div class="card border-success">
+                            <div class="card-header bg-success text-white">
+                                <h6 class="mb-0"><i class="fas fa-database me-2"></i>Produto Existente</h6>
+                            </div>
+                            <div class="card-body">
+                                <h5 id="existing-product-name" class="text-success"></h5>
+                                <p><strong>Código:</strong> <span id="existing-product-code"></span></p>
+                                <p><strong>Preço Médio:</strong> <span id="existing-product-avg-price"></span></p>
+                                <p><strong>Quantidade Total:</strong> <span id="existing-product-total-qty"></span></p>
+                                <p><strong>Fornecedores:</strong> <span id="existing-product-suppliers"></span></p>
+                                <p><strong>Última Compra:</strong> <span id="existing-product-last-purchase"></span></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Comparação de Fornecedores -->
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0"><i class="fas fa-chart-line me-2"></i>Comparação de Preços por Fornecedor</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-striped">
+                                        <thead class="table-dark">
+                                            <tr>
+                                                <th>Fornecedor</th>
+                                                <th class="text-end">Preço</th>
+                                                <th class="text-center">Data</th>
+                                                <th class="text-center">Quantidade</th>
+                                                <th class="text-center">Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="supplier-comparison-table">
+                                            <!-- Dados serão inseridos via JavaScript -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Ações -->
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Associação:</strong> Ao confirmar, o produto da planilha será associado ao produto existente, 
+                            unindo todas as compras e permitindo comparação de preços entre fornecedores.
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success" id="confirm-association-btn" onclick="confirmProductAssociation()">
+                    <i class="fas fa-compress-alt me-2"></i>Confirmar Unificação
+                </button>
             </div>
         </div>
     </div>
