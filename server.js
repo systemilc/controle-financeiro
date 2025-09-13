@@ -2,6 +2,8 @@ const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const bcrypt = require('bcryptjs');
 const path = require('path');
+const multer = require('multer');
+const XLSX = require('xlsx');
 
 const app = express();
 const PORT = 3000;
@@ -10,6 +12,29 @@ const SALT_ROUNDS = 10;
 // Configura o middleware para servir arquivos estáticos
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
+
+// Configuração do multer para upload de arquivos
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, 'uploads/');
+    },
+    filename: function (req, file, cb) {
+        cb(null, Date.now() + '-' + file.originalname);
+    }
+});
+
+const upload = multer({ 
+    storage: storage,
+    fileFilter: function (req, file, cb) {
+        const allowedTypes = ['.xlsx', '.xls', '.csv'];
+        const ext = path.extname(file.originalname).toLowerCase();
+        if (allowedTypes.includes(ext)) {
+            cb(null, true);
+        } else {
+            cb(new Error('Apenas arquivos Excel (.xlsx, .xls) e CSV são permitidos'));
+        }
+    }
+});
 
 // Conecta ao banco de dados ou cria um novo arquivo se não existir
 const db = new sqlite3.Database('financas.db', (err) => {
@@ -83,6 +108,129 @@ db.serialize(() => {
             is_asset INTEGER DEFAULT 0, -- 1 se é considerado ativo
             UNIQUE(group_id, name), -- Garante que não haja tipos de pagamento duplicados por grupo
             FOREIGN KEY(group_id) REFERENCES users(group_id)
+        )
+    `);
+
+    // Tabela de fornecedores/lojas
+    db.run(`
+        CREATE TABLE IF NOT EXISTS suppliers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            group_id INTEGER,
+            name TEXT NOT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(group_id, name),
+            FOREIGN KEY(group_id) REFERENCES users(group_id)
+        )
+    `);
+
+    // Tabela de produtos
+    db.run(`
+        CREATE TABLE IF NOT EXISTS products (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            group_id INTEGER,
+            name TEXT NOT NULL,
+            code TEXT,
+            quantity REAL DEFAULT 0,
+            total_value REAL DEFAULT 0,
+            average_price REAL DEFAULT 0,
+            last_purchase_date TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(group_id, name, code),
+            FOREIGN KEY(group_id) REFERENCES users(group_id)
+        )
+    `);
+
+    // Migração: Adicionar colunas de estoque se não existirem
+    db.run(`ALTER TABLE products ADD COLUMN quantity REAL DEFAULT 0`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+            console.error('Erro ao adicionar coluna quantity:', err);
+        }
+    });
+    
+    db.run(`ALTER TABLE products ADD COLUMN total_value REAL DEFAULT 0`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+            console.error('Erro ao adicionar coluna total_value:', err);
+        }
+    });
+    
+    db.run(`ALTER TABLE products ADD COLUMN average_price REAL DEFAULT 0`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+            console.error('Erro ao adicionar coluna average_price:', err);
+        }
+    });
+    
+    db.run(`ALTER TABLE products ADD COLUMN last_purchase_date TEXT`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+            console.error('Erro ao adicionar coluna last_purchase_date:', err);
+        }
+    });
+
+    // Tabela de associações de produtos
+    db.run(`
+        CREATE TABLE IF NOT EXISTS product_associations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            product_id INTEGER NOT NULL,
+            associated_product_id INTEGER NOT NULL,
+            group_id INTEGER,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(product_id) REFERENCES products(id),
+            FOREIGN KEY(associated_product_id) REFERENCES products(id),
+            FOREIGN KEY(group_id) REFERENCES users(group_id),
+            UNIQUE(product_id, associated_product_id)
+        )
+    `);
+
+    // Tabela de compras/notas fiscais
+    db.run(`
+        CREATE TABLE IF NOT EXISTS purchases (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            group_id INTEGER,
+            user_id INTEGER,
+            supplier_id INTEGER,
+            account_id INTEGER,
+            payment_type_id INTEGER,
+            invoice_number TEXT NOT NULL,
+            total_amount REAL NOT NULL,
+            purchase_date TEXT NOT NULL,
+            installment_count INTEGER DEFAULT 1,
+            installment_interval_days INTEGER DEFAULT 30,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(group_id) REFERENCES users(group_id),
+            FOREIGN KEY(user_id) REFERENCES users(id),
+            FOREIGN KEY(supplier_id) REFERENCES suppliers(id),
+            FOREIGN KEY(account_id) REFERENCES accounts(id),
+            FOREIGN KEY(payment_type_id) REFERENCES payment_types(id)
+        )
+    `);
+
+    // Tabela de itens de compra
+    db.run(`
+        CREATE TABLE IF NOT EXISTS purchase_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            purchase_id INTEGER,
+            product_id INTEGER,
+            quantity REAL NOT NULL,
+            unit_price REAL NOT NULL,
+            total_price REAL NOT NULL,
+            product_code TEXT,
+            product_name TEXT NOT NULL,
+            FOREIGN KEY(purchase_id) REFERENCES purchases(id),
+            FOREIGN KEY(product_id) REFERENCES products(id)
+        )
+    `);
+
+    // Tabela de parcelas de compra
+    db.run(`
+        CREATE TABLE IF NOT EXISTS purchase_installments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            purchase_id INTEGER,
+            installment_number INTEGER NOT NULL,
+            amount REAL NOT NULL,
+            due_date TEXT NOT NULL,
+            is_paid INTEGER DEFAULT 0,
+            paid_at TEXT DEFAULT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(purchase_id) REFERENCES purchases(id)
         )
     `);
     
@@ -897,6 +1045,1265 @@ app.delete('/api/payment-types/:id', authenticate, (req, res) => {
             res.status(200).json({ message: 'Tipo de pagamento deletado com sucesso!' });
         });
     });
+});
+
+// --- ROTAS DA API DE FORNECEDORES ---
+
+// POST: Criar um novo fornecedor
+app.post('/api/suppliers', authenticate, (req, res) => {
+    const { name } = req.body;
+    const groupId = req.groupId;
+
+    if (!name) {
+        return res.status(400).json({ message: 'Nome do fornecedor é obrigatório.' });
+    }
+
+    db.run(`INSERT INTO suppliers (group_id, name) VALUES (?, ?)`, 
+        [groupId, name], 
+        function(err) {
+            if (err) {
+                if (err.message.includes('UNIQUE constraint failed')) {
+                    return res.status(400).json({ message: 'Já existe um fornecedor com este nome para o seu grupo.' });
+                }
+                console.error('Erro ao inserir fornecedor no banco de dados:', err.message);
+                return res.status(500).json({ message: 'Erro ao criar fornecedor', error: err.message });
+            }
+            res.status(201).json({ 
+                id: this.lastID, 
+                name, 
+                group_id: groupId 
+            });
+        });
+});
+
+// GET: Listar todos os fornecedores do grupo do usuário
+app.get('/api/suppliers', authenticate, (req, res) => {
+    const groupId = req.groupId;
+
+    db.all(`SELECT id, name, created_at FROM suppliers WHERE group_id = ? ORDER BY name ASC`, [groupId], (err, rows) => {
+        if (err) {
+            console.error('Erro ao buscar fornecedores no banco de dados:', err.message);
+            return res.status(500).json({ message: 'Erro ao buscar fornecedores', error: err.message });
+        }
+        res.json(rows);
+    });
+});
+
+// --- ROTAS DA API DE PRODUTOS ---
+
+// POST: Criar um novo produto
+app.post('/api/products', authenticate, (req, res) => {
+    const { name, code } = req.body;
+    const groupId = req.groupId;
+
+    if (!name) {
+        return res.status(400).json({ message: 'Nome do produto é obrigatório.' });
+    }
+
+    db.run(`INSERT INTO products (group_id, name, code) VALUES (?, ?, ?)`, 
+        [groupId, name, code || null], 
+        function(err) {
+            if (err) {
+                if (err.message.includes('UNIQUE constraint failed')) {
+                    return res.status(400).json({ message: 'Já existe um produto com este nome e código para o seu grupo.' });
+                }
+                console.error('Erro ao inserir produto no banco de dados:', err.message);
+                return res.status(500).json({ message: 'Erro ao criar produto', error: err.message });
+            }
+            res.status(201).json({ 
+                id: this.lastID, 
+                name, 
+                code: code || null,
+                group_id: groupId 
+            });
+        });
+});
+
+// GET: Listar todos os produtos do grupo do usuário com informações detalhadas
+app.get('/api/products', authenticate, (req, res) => {
+    const groupId = req.groupId;
+
+    const query = `
+        SELECT 
+            p.id,
+            p.name,
+            p.code,
+            p.created_at,
+            GROUP_CONCAT(DISTINCT s.name) as suppliers,
+            AVG(pi.unit_price) as average_price,
+            MAX(pi.unit_price) as last_price,
+            SUM(pi.quantity) as total_quantity,
+            MAX(pur.purchase_date) as last_purchase
+        FROM products p
+        LEFT JOIN purchase_items pi ON p.id = pi.product_id
+        LEFT JOIN purchases pur ON pi.purchase_id = pur.id
+        LEFT JOIN suppliers s ON pur.supplier_id = s.id
+        WHERE p.group_id = ?
+        GROUP BY p.id, p.name, p.code, p.created_at
+        ORDER BY p.name ASC
+    `;
+
+    db.all(query, [groupId], (err, rows) => {
+        if (err) {
+            console.error('Erro ao buscar produtos no banco de dados:', err.message);
+            return res.status(500).json({ message: 'Erro ao buscar produtos', error: err.message });
+        }
+        
+        // Formatar os dados
+        const formattedRows = rows.map(row => ({
+            ...row,
+            suppliers: row.suppliers || 'N/A',
+            average_price: row.average_price ? parseFloat(row.average_price).toFixed(2) : '0,00',
+            last_price: row.last_price ? parseFloat(row.last_price).toFixed(2) : '0,00',
+            total_quantity: row.total_quantity || 0,
+            last_purchase: row.last_purchase || 'N/A'
+        }));
+        
+        res.json(formattedRows);
+    });
+});
+
+// GET: Buscar detalhes completos de um produto
+app.get('/api/products/:id/details', authenticate, (req, res) => {
+    const productId = req.params.id;
+    const groupId = req.groupId;
+    
+    // Buscar informações básicas do produto
+    const productQuery = `
+        SELECT 
+            p.id, p.name, p.code, p.created_at,
+            GROUP_CONCAT(DISTINCT s.name) as suppliers,
+            AVG(pi.unit_price) as average_price,
+            MAX(pi.unit_price) as last_price,
+            MIN(pi.unit_price) as min_price,
+            SUM(pi.quantity) as total_quantity,
+            MAX(pur.purchase_date) as last_purchase
+        FROM products p
+        LEFT JOIN purchase_items pi ON p.id = pi.product_id
+        LEFT JOIN purchases pur ON pi.purchase_id = pur.id
+        LEFT JOIN suppliers s ON pur.supplier_id = s.id
+        WHERE p.id = ? AND p.group_id = ?
+        GROUP BY p.id, p.name, p.code, p.created_at
+    `;
+    
+    // Buscar fornecedor com menor preço
+    const minPriceQuery = `
+        SELECT 
+            s.name as supplier_name,
+            pi.unit_price,
+            pur.purchase_date
+        FROM purchase_items pi
+        JOIN purchases pur ON pi.purchase_id = pur.id
+        JOIN suppliers s ON pur.supplier_id = s.id
+        WHERE pi.product_id = ? AND pur.group_id = ?
+        ORDER BY pi.unit_price ASC
+        LIMIT 1
+    `;
+    
+    // Buscar produtos associados
+    const associatedProductsQuery = `
+        SELECT 
+            pa.associated_product_id,
+            p.name,
+            p.code
+        FROM product_associations pa
+        JOIN products p ON pa.associated_product_id = p.id
+        WHERE pa.product_id = ? AND pa.group_id = ?
+        UNION
+        SELECT 
+            pa.product_id as associated_product_id,
+            p.name,
+            p.code
+        FROM product_associations pa
+        JOIN products p ON pa.product_id = p.id
+        WHERE pa.associated_product_id = ? AND pa.group_id = ?
+    `;
+
+    // Buscar histórico de compras do produto e produtos associados
+    const historyQuery = `
+        SELECT 
+            pur.invoice_number,
+            s.name as supplier_name,
+            pur.purchase_date,
+            pi.quantity,
+            pi.unit_price,
+            (pi.quantity * pi.unit_price) as total,
+            a.name as account_name,
+            pt.name as payment_type_name,
+            p.name as product_name,
+            p.code as product_code
+        FROM purchase_items pi
+        JOIN purchases pur ON pi.purchase_id = pur.id
+        JOIN suppliers s ON pur.supplier_id = s.id
+        JOIN accounts a ON pur.account_id = a.id
+        JOIN payment_types pt ON pur.payment_type_id = pt.id
+        JOIN products p ON pi.product_id = p.id
+        WHERE (
+            pi.product_id = ? 
+            OR pi.product_id IN (
+                SELECT associated_product_id FROM product_associations 
+                WHERE product_id = ? AND group_id = ?
+                UNION
+                SELECT product_id FROM product_associations 
+                WHERE associated_product_id = ? AND group_id = ?
+            )
+        ) AND pur.group_id = ?
+        ORDER BY pur.purchase_date DESC, pur.created_at DESC
+    `;
+    
+    db.get(productQuery, [productId, groupId], (err, product) => {
+        if (err) {
+            console.error('Erro ao buscar produto:', err);
+            return res.status(500).json({ message: 'Erro interno do servidor' });
+        }
+        
+        if (!product) {
+            return res.status(404).json({ message: 'Produto não encontrado' });
+        }
+        
+        // Buscar fornecedor com menor preço
+        db.get(minPriceQuery, [productId, groupId], (err, minPriceSupplier) => {
+            if (err) {
+                console.error('Erro ao buscar fornecedor com menor preço:', err);
+                return res.status(500).json({ message: 'Erro interno do servidor' });
+            }
+            
+            // Buscar produtos associados
+            db.all(associatedProductsQuery, [productId, groupId, productId, groupId], (err, associatedProducts) => {
+                if (err) {
+                    console.error('Erro ao buscar produtos associados:', err);
+                    return res.status(500).json({ message: 'Erro interno do servidor' });
+                }
+                
+                // Buscar histórico de compras
+                db.all(historyQuery, [productId, productId, groupId, productId, groupId, groupId], (err, history) => {
+                    if (err) {
+                        console.error('Erro ao buscar histórico:', err);
+                        return res.status(500).json({ message: 'Erro interno do servidor' });
+                    }
+                
+                // Formatar dados do produto
+                const formattedProduct = {
+                    ...product,
+                    suppliers: product.suppliers || 'N/A',
+                    average_price: product.average_price ? parseFloat(product.average_price).toFixed(2) : '0,00',
+                    last_price: product.last_price ? parseFloat(product.last_price).toFixed(2) : '0,00',
+                    min_price: product.min_price ? parseFloat(product.min_price).toFixed(2) : '0,00',
+                    total_quantity: product.total_quantity || 0,
+                    last_purchase: product.last_purchase || 'N/A',
+                    created_at: new Date(product.created_at).toLocaleDateString('pt-BR'),
+                    min_price_supplier: minPriceSupplier ? {
+                        name: minPriceSupplier.supplier_name,
+                        price: parseFloat(minPriceSupplier.unit_price).toFixed(2).replace('.', ','),
+                        date: new Date(minPriceSupplier.purchase_date).toLocaleDateString('pt-BR')
+                    } : null
+                };
+                
+                // Formatar histórico de compras
+                const formattedHistory = history.map(item => ({
+                    ...item,
+                    purchase_date: new Date(item.purchase_date).toLocaleDateString('pt-BR'),
+                    unit_price: parseFloat(item.unit_price).toFixed(2).replace('.', ','),
+                    total: parseFloat(item.total).toFixed(2).replace('.', ',')
+                }));
+                
+                res.json({
+                    product: formattedProduct,
+                    purchaseHistory: formattedHistory,
+                    associatedProducts: associatedProducts
+                });
+                });
+            });
+        });
+    });
+});
+
+// POST: Associar produtos
+app.post('/api/products/associate', authenticate, (req, res) => {
+    const { productId, associatedProductId, keepNewName = false } = req.body;
+    const groupId = req.groupId;
+    
+    console.log('--- POST /api/products/associate ---');
+    console.log('ProductId:', productId);
+    console.log('AssociatedProductId:', associatedProductId);
+    console.log('KeepNewName:', keepNewName);
+    console.log('GroupId:', groupId);
+
+    if (!productId || !associatedProductId) {
+        console.log('❌ IDs dos produtos são obrigatórios');
+        return res.status(400).json({ message: 'IDs dos produtos são obrigatórios' });
+    }
+
+    if (productId === associatedProductId) {
+        console.log('❌ Um produto não pode ser associado a si mesmo');
+        return res.status(400).json({ message: 'Um produto não pode ser associado a si mesmo' });
+    }
+
+    // Verificar se os produtos existem
+    const checkProductsQuery = `
+        SELECT id FROM products 
+        WHERE id IN (?, ?) AND group_id = ?
+    `;
+    
+    db.all(checkProductsQuery, [productId, associatedProductId, groupId], (err, products) => {
+        if (err) {
+            console.error('❌ Erro ao verificar produtos:', err);
+            return res.status(500).json({ message: 'Erro interno do servidor' });
+        }
+
+        console.log('Produtos encontrados:', products);
+
+        if (products.length !== 2) {
+            console.log('❌ Um ou ambos os produtos não foram encontrados');
+            return res.status(404).json({ message: 'Um ou ambos os produtos não foram encontrados' });
+        }
+
+        // Unificar produtos em vez de apenas associar
+        console.log('Unificando produtos...');
+        
+        // 1. Buscar dados dos dois produtos
+        const getProductsQuery = `
+            SELECT p.*, GROUP_CONCAT(DISTINCT s.name) as suppliers
+            FROM products p
+            LEFT JOIN purchase_items pi ON p.id = pi.product_id
+            LEFT JOIN purchases pur ON pi.purchase_id = pur.id
+            LEFT JOIN suppliers s ON pur.supplier_id = s.id
+            WHERE p.id IN (?, ?) AND p.group_id = ?
+            GROUP BY p.id
+        `;
+        
+        console.log('🔍 === DEBUG: Buscando produtos para unificação ===');
+        console.log('📦 Query:', getProductsQuery);
+        console.log('📦 Parâmetros:', [productId, associatedProductId, groupId]);
+        
+        console.log('🔍 === DEBUG: Buscando produtos para unificação ===');
+        console.log('📦 ProductId (importado):', productId);
+        console.log('📦 AssociatedProductId (existente):', associatedProductId);
+        console.log('👥 GroupId:', groupId);
+        
+        db.all(getProductsQuery, [productId, associatedProductId, groupId], (err, products) => {
+            if (err) {
+                console.error('❌ Erro ao buscar produtos:', err);
+                return res.status(500).json({ message: 'Erro ao buscar produtos' });
+            }
+            
+            if (products.length !== 2) {
+                console.log('❌ Produtos não encontrados para unificação');
+                return res.status(404).json({ message: 'Produtos não encontrados' });
+            }
+            
+        const [product1, product2] = products;
+        
+        // Lógica simplificada: sempre manter o produto existente (associatedProductId)
+        let mainProduct, secondaryProduct;
+        
+        // Identificar qual produto é o importado (productId) e qual é o existente (associatedProductId)
+        const importedProduct = product1.id == productId ? product1 : product2;
+        const existingProduct = product1.id == associatedProductId ? product1 : product2;
+        
+        // SEMPRE manter o produto existente como principal
+        mainProduct = existingProduct;
+        secondaryProduct = importedProduct;
+        
+        // Debug: Verificar se a identificação está correta
+        console.log('🔍 === DEBUG: Identificação dos produtos ===');
+        console.log('📦 ProductId (importado):', productId);
+        console.log('📦 AssociatedProductId (existente):', associatedProductId);
+        console.log('📦 Product1 ID:', product1.id, 'Name:', product1.name);
+        console.log('📦 Product2 ID:', product2.id, 'Name:', product2.name);
+        console.log('📦 Imported Product ID:', importedProduct.id, 'Name:', importedProduct.name);
+        console.log('📦 Existing Product ID:', existingProduct.id, 'Name:', existingProduct.name);
+        console.log('📦 Main Product (será mantido):', mainProduct.id, 'Name:', mainProduct.name);
+        console.log('📦 Secondary Product (será removido):', secondaryProduct.id, 'Name:', secondaryProduct.name);
+            
+        console.log('=== UNIFICAÇÃO SIMPLIFICADA ===');
+        console.log('📦 Produto importado (será removido):', importedProduct.name, '(ID:', importedProduct.id, ')');
+        console.log('📦 Produto existente (será mantido):', existingProduct.name, '(ID:', existingProduct.id, ')');
+        console.log('🔄 Transferindo estoque e histórico do importado para o existente...');
+        console.log('==========================================');
+            
+            // 2. Unificar fornecedores
+            const suppliers1 = mainProduct.suppliers ? mainProduct.suppliers.split(',') : [];
+            const suppliers2 = secondaryProduct.suppliers ? secondaryProduct.suppliers.split(',') : [];
+            const allSuppliers = [...new Set([...suppliers1, ...suppliers2])].filter(s => s);
+            
+            console.log('Fornecedores unificados:', allSuppliers);
+            
+            // 3. Verificar purchase_items antes da transferência
+            const checkItemsQuery = `
+                SELECT pi.*, pur.supplier_id, s.name as supplier_name, pur.purchase_date
+                FROM purchase_items pi
+                LEFT JOIN purchases pur ON pi.purchase_id = pur.id
+                LEFT JOIN suppliers s ON pur.supplier_id = s.id
+                WHERE pi.product_id IN (?, ?)
+                ORDER BY pi.product_id, pur.purchase_date
+            `;
+            
+            console.log('🔍 === DEBUG: Verificando purchase_items antes da transferência ===');
+            console.log('📦 Query:', checkItemsQuery);
+            console.log('📦 Parâmetros:', [mainProduct.id, secondaryProduct.id]);
+            
+            db.all(checkItemsQuery, [mainProduct.id, secondaryProduct.id], (err, items) => {
+                if (err) {
+                    console.error('❌ Erro ao verificar purchase_items:', err);
+                    return res.status(500).json({ message: 'Erro ao verificar histórico' });
+                }
+                
+                console.log('📊 === DEBUG: Purchase Items antes da transferência ===');
+                console.log('📦 Total de itens encontrados:', items.length);
+                console.log('🔍 Produto principal (destino):', mainProduct.id, mainProduct.name);
+                console.log('🔍 Produto secundário (origem):', secondaryProduct.id, secondaryProduct.name);
+                
+                items.forEach((item, index) => {
+                    console.log(`  ${index + 1}. Produto ID: ${item.product_id}, Nome: ${item.product_name}, Qtd: ${item.quantity}, Preço: ${item.unit_price}, Fornecedor: ${item.supplier_name}, Data: ${item.purchase_date}`);
+                });
+                
+                // Verificar quantos itens pertencem a cada produto
+                const mainProductItems = items.filter(item => item.product_id === mainProduct.id);
+                const secondaryProductItems = items.filter(item => item.product_id === secondaryProduct.id);
+                
+                console.log(`📊 Itens do produto principal (${mainProduct.name}): ${mainProductItems.length}`);
+                console.log(`📊 Itens do produto secundário (${secondaryProduct.name}): ${secondaryProductItems.length}`);
+                
+                // Debug adicional: verificar se existem purchase_items para ambos os produtos
+                console.log('🔍 === DEBUG: Verificando purchase_items individuais ===');
+                db.all(`SELECT * FROM purchase_items WHERE product_id = ?`, [mainProduct.id], (err, mainItems) => {
+                    if (err) {
+                        console.error('❌ Erro ao verificar purchase_items do produto principal:', err);
+                    } else {
+                        console.log(`🔍 Purchase_items do produto principal (ID ${mainProduct.id}):`, mainItems.length, 'itens');
+                        if (mainItems.length > 0) {
+                            console.log('📋 Itens do produto principal:', mainItems);
+                        }
+                    }
+                });
+                
+                db.all(`SELECT * FROM purchase_items WHERE product_id = ?`, [secondaryProduct.id], (err, secondaryItems) => {
+                    if (err) {
+                        console.error('❌ Erro ao verificar purchase_items do produto secundário:', err);
+                    } else {
+                        console.log(`🔍 Purchase_items do produto secundário (ID ${secondaryProduct.id}):`, secondaryItems.length, 'itens');
+                        if (secondaryItems.length > 0) {
+                            console.log('📋 Itens do produto secundário:', secondaryItems);
+                        }
+                    }
+                });
+                
+                // Transferir todo o histórico de compras do produto secundário para o principal
+                const transferHistoryQuery = `
+                    UPDATE purchase_items 
+                    SET product_id = ?
+                    WHERE product_id = ?
+                `;
+                
+                console.log('🔄 === DEBUG: Executando transferência de histórico ===');
+                console.log('📦 Query:', transferHistoryQuery);
+                console.log('📦 Parâmetros:', [mainProduct.id, secondaryProduct.id]);
+                console.log('📦 Transferindo de produto ID', secondaryProduct.id, 'para produto ID', mainProduct.id);
+                
+                // Verificar se existem purchase_items para o produto secundário antes da transferência
+                db.all(`SELECT * FROM purchase_items WHERE product_id = ?`, [secondaryProduct.id], (err, itemsToTransfer) => {
+                    if (err) {
+                        console.error('❌ Erro ao verificar purchase_items do produto secundário:', err);
+                        return res.status(500).json({ message: 'Erro ao verificar histórico' });
+                    }
+                    
+                    console.log(`🔍 Purchase_items do produto secundário (ID ${secondaryProduct.id}):`, itemsToTransfer.length, 'itens');
+                    if (itemsToTransfer.length > 0) {
+                        console.log('📋 Itens que serão transferidos:', itemsToTransfer);
+                    }
+                    
+                    db.run(transferHistoryQuery, [mainProduct.id, secondaryProduct.id], function(err) {
+                        if (err) {
+                            console.error('❌ Erro ao transferir histórico:', err);
+                            return res.status(500).json({ message: 'Erro ao transferir histórico' });
+                        }
+                        
+                        console.log(`✅ Histórico transferido: ${this.changes} itens de compra transferidos`);
+                        console.log(`🔄 Transferindo de produto ID ${secondaryProduct.id} (${secondaryProduct.name}) para produto ID ${mainProduct.id} (${mainProduct.name})`);
+                        
+                        if (this.changes === 0) {
+                            console.log('⚠️ ATENÇÃO: Nenhum item foi transferido! Isso pode indicar que:');
+                            console.log('   1. O produto secundário não tem purchase_items');
+                            console.log('   2. Os IDs dos produtos estão incorretos');
+                            console.log('   3. Os purchase_items já pertencem ao produto principal');
+                        }
+                    
+                        // Verificar purchase_items após a transferência
+                        console.log('🔍 === DEBUG: Verificando purchase_items após transferência ===');
+                        console.log('📦 Query de verificação:', checkItemsQuery);
+                        console.log('📦 Parâmetros da verificação:', [mainProduct.id, mainProduct.id]);
+                        
+                        db.all(checkItemsQuery, [mainProduct.id, mainProduct.id], (err, itemsAfter) => {
+                            if (err) {
+                                console.error('❌ Erro ao verificar purchase_items após transferência:', err);
+                            } else {
+                            console.log('📊 === DEBUG: Purchase Items após transferência ===');
+                            console.log('📦 Total de itens no produto principal:', itemsAfter.length);
+                            
+                            // Calcular totais
+                            const totalQuantity = itemsAfter.reduce((sum, item) => sum + (item.quantity || 0), 0);
+                            const totalValue = itemsAfter.reduce((sum, item) => sum + (item.total_price || 0), 0);
+                            
+                            console.log(`📊 Quantidade total unificada: ${totalQuantity}`);
+                            console.log(`📊 Valor total unificado: R$ ${totalValue.toFixed(2)}`);
+                            
+                            itemsAfter.forEach((item, index) => {
+                                console.log(`  ${index + 1}. Produto ID: ${item.product_id}, Nome: ${item.product_name}, Qtd: ${item.quantity}, Preço: ${item.unit_price}, Fornecedor: ${item.supplier_name}, Data: ${item.purchase_date}`);
+                            });
+                            
+                            // Debug adicional: verificar se o produto principal tem purchase_items
+                            db.all(`SELECT * FROM purchase_items WHERE product_id = ?`, [mainProduct.id], (err, mainItems) => {
+                                if (err) {
+                                    console.error('❌ Erro ao verificar purchase_items do produto principal:', err);
+                                } else {
+                                    console.log(`🔍 Purchase_items do produto principal (ID ${mainProduct.id}):`, mainItems.length, 'itens');
+                                    if (mainItems.length > 0) {
+                                        console.log('📋 Itens do produto principal:', mainItems);
+                                    }
+                                }
+                            });
+                            }
+                            
+                            // Continuar com a atualização do produto principal
+                            continueWithUpdate();
+                        });
+                    });
+                });
+            });
+            
+            const continueWithUpdate = () => {
+                // 4. Calcular estoque total unificado
+                console.log('🔄 === DEBUG: Calculando estoque total unificado ===');
+                
+                const calculateStockQuery = `
+                    SELECT 
+                        SUM(quantity) as total_quantity,
+                        SUM(total_price) as total_value,
+                        AVG(unit_price) as average_price,
+                        MAX(purchase_date) as last_purchase_date
+                    FROM purchase_items pi
+                    LEFT JOIN purchases pur ON pi.purchase_id = pur.id
+                    WHERE pi.product_id = ?
+                `;
+                
+                db.get(calculateStockQuery, [mainProduct.id], (err, stockData) => {
+                    if (err) {
+                        console.error('❌ Erro ao calcular estoque:', err);
+                        return res.status(500).json({ message: 'Erro ao calcular estoque' });
+                    }
+                    
+                    const totalQuantity = stockData.total_quantity || 0;
+                    const totalValue = stockData.total_value || 0;
+                    const averagePrice = stockData.average_price || 0;
+                    const lastPurchaseDate = stockData.last_purchase_date;
+                    
+                    console.log('📊 === DEBUG: Dados do estoque calculado ===');
+                    console.log('📦 Quantidade total:', totalQuantity);
+                    console.log('📦 Valor total:', totalValue);
+                    console.log('📦 Preço médio:', averagePrice);
+                    console.log('📦 Última compra:', lastPurchaseDate);
+                    
+                    // 5. Atualizar o produto principal com nome, código e estoque unificados
+                    const updateMainQuery = `
+                        UPDATE products 
+                        SET name = ?, code = ?, quantity = ?, total_value = ?, average_price = ?, last_purchase_date = ?
+                        WHERE id = ?
+                    `;
+                    
+                    // Usar o nome e código do produto principal (já determinado pela escolha)
+                    const unifiedName = mainProduct.name;
+                    const unifiedCode = mainProduct.code;
+                    
+                    console.log('🔄 === DEBUG: Atualizando produto principal com estoque ===');
+                    console.log('📦 Query:', updateMainQuery);
+                    console.log('📦 Parâmetros:', [unifiedName, unifiedCode, totalQuantity, totalValue, averagePrice, lastPurchaseDate, mainProduct.id]);
+                    console.log('📦 Produto principal ID:', mainProduct.id);
+                    console.log('📦 Nome unificado:', unifiedName);
+                    console.log('📦 Código unificado:', unifiedCode);
+                    console.log('📦 Estoque unificado:', totalQuantity);
+                    console.log('📦 Valor unificado:', totalValue);
+                    
+                    db.run(updateMainQuery, [unifiedName, unifiedCode, totalQuantity, totalValue, averagePrice, lastPurchaseDate, mainProduct.id], function(err) {
+                        if (err) {
+                            console.error('❌ Erro ao atualizar produto principal:', err);
+                            return res.status(500).json({ message: 'Erro ao atualizar produto principal' });
+                        }
+                        
+                        console.log(`✅ Produto principal atualizado com estoque: ${this.changes} linhas afetadas`);
+                        
+                        // 6. Remover o produto secundário (agora que todo o histórico foi transferido)
+                        const deleteSecondaryQuery = `DELETE FROM products WHERE id = ?`;
+                        
+                        console.log('🔄 === DEBUG: Removendo produto secundário ===');
+                        console.log('📦 Query:', deleteSecondaryQuery);
+                        console.log('📦 Parâmetros:', [secondaryProduct.id]);
+                        console.log('📦 Produto secundário ID:', secondaryProduct.id);
+                        console.log('📦 Nome do produto secundário:', secondaryProduct.name);
+                        
+                        db.run(deleteSecondaryQuery, [secondaryProduct.id], function(err) {
+                            if (err) {
+                                console.error('❌ Erro ao remover produto secundário:', err);
+                                return res.status(500).json({ message: 'Erro ao remover produto secundário' });
+                            }
+                            
+                            console.log(`✅ Produto secundário removido: ${this.changes} linhas afetadas`);
+                        
+                            console.log('✅ UNIFICAÇÃO CONCLUÍDA COM SUCESSO!');
+                            console.log(`📦 Produto mantido: ${mainProduct.name} (ID: ${mainProduct.id})`);
+                            console.log(`🗑️ Produto removido: ${secondaryProduct.name} (ID: ${secondaryProduct.id})`);
+                            console.log(`🏪 Fornecedores unificados: ${allSuppliers.join(', ')}`);
+                            console.log(`📊 Histórico de compras transferido`);
+                            console.log(`📦 Estoque total unificado: ${totalQuantity} unidades`);
+                            console.log(`💰 Valor total unificado: R$ ${totalValue.toFixed(2)}`);
+                            console.log(`📈 Preço médio unificado: R$ ${averagePrice.toFixed(2)}`);
+                            
+                            console.log('📤 === DEBUG: Enviando resposta final ===');
+                            console.log('📦 Produto principal mantido:', {
+                                id: mainProduct.id,
+                                name: unifiedName,
+                                code: unifiedCode,
+                                quantity: totalQuantity,
+                                total_value: totalValue,
+                                average_price: averagePrice,
+                                last_purchase_date: lastPurchaseDate,
+                                suppliers: allSuppliers
+                            });
+                            console.log('📦 Produto secundário removido:', {
+                                id: secondaryProduct.id,
+                                name: secondaryProduct.name
+                            });
+                            
+                            res.json({ 
+                                success: true, 
+                                message: `Produtos unificados com sucesso! O produto "${mainProduct.name}" agora contém todo o estoque e histórico.`,
+                                mainProduct: {
+                                    id: mainProduct.id,
+                                    name: unifiedName,
+                                    code: unifiedCode,
+                                    quantity: totalQuantity,
+                                    total_value: totalValue,
+                                    average_price: averagePrice,
+                                    last_purchase_date: lastPurchaseDate,
+                                    suppliers: allSuppliers
+                                },
+                                removedProduct: {
+                                    id: secondaryProduct.id,
+                                    name: secondaryProduct.name
+                                }
+                            });
+                        });
+                    });
+                });
+            };
+        });
+    });
+});
+
+// DELETE: Desassociar produtos
+app.delete('/api/products/associate', authenticate, (req, res) => {
+    const { productId, associatedProductId } = req.body;
+    const groupId = req.groupId;
+
+    if (!productId || !associatedProductId) {
+        return res.status(400).json({ message: 'IDs dos produtos são obrigatórios' });
+    }
+
+    const deleteQuery = `
+        DELETE FROM product_associations 
+        WHERE ((product_id = ? AND associated_product_id = ?) 
+               OR (product_id = ? AND associated_product_id = ?))
+        AND group_id = ?
+    `;
+
+    db.run(deleteQuery, [productId, associatedProductId, associatedProductId, productId, groupId], function(err) {
+        if (err) {
+            console.error('Erro ao remover associação:', err);
+            return res.status(500).json({ message: 'Erro ao remover associação' });
+        }
+
+        res.json({ 
+            success: true, 
+            message: 'Associação removida com sucesso',
+            associationsRemoved: this.changes
+        });
+    });
+});
+
+// GET: Debug - Verificar produtos e purchase_items
+app.get('/api/debug/products/:id', authenticate, (req, res) => {
+    const productId = req.params.id;
+    const groupId = req.groupId;
+    
+    console.log('=== DEBUG: Verificando produto ID:', productId, 'Group:', groupId);
+    
+    // Buscar dados do produto
+    const productQuery = `
+        SELECT p.*, GROUP_CONCAT(DISTINCT s.name) as suppliers
+        FROM products p
+        LEFT JOIN purchase_items pi ON p.id = pi.product_id
+        LEFT JOIN purchases pur ON pi.purchase_id = pur.id
+        LEFT JOIN suppliers s ON pur.supplier_id = s.id
+        WHERE p.id = ? AND p.group_id = ?
+        GROUP BY p.id
+    `;
+    
+    db.get(productQuery, [productId, groupId], (err, product) => {
+        if (err) {
+            console.error('❌ Erro ao buscar produto:', err);
+            return res.status(500).json({ message: 'Erro ao buscar produto' });
+        }
+        
+        if (!product) {
+            return res.status(404).json({ message: 'Produto não encontrado' });
+        }
+        
+        // Buscar purchase_items do produto
+        const itemsQuery = `
+            SELECT pi.*, pur.supplier_id, s.name as supplier_name, pur.purchase_date
+            FROM purchase_items pi
+            LEFT JOIN purchases pur ON pi.purchase_id = pur.id
+            LEFT JOIN suppliers s ON pur.supplier_id = s.id
+            WHERE pi.product_id = ?
+            ORDER BY pur.purchase_date
+        `;
+        
+        db.all(itemsQuery, [productId], (err, items) => {
+            if (err) {
+                console.error('❌ Erro ao buscar purchase_items:', err);
+                return res.status(500).json({ message: 'Erro ao buscar histórico' });
+            }
+            
+            console.log('=== DEBUG: Dados do produto ===');
+            console.log('Produto:', product);
+            console.log('Purchase Items:', items);
+            
+            res.json({
+                product: product,
+                purchaseItems: items,
+                totalQuantity: items.reduce((sum, item) => sum + (item.quantity || 0), 0),
+                totalValue: items.reduce((sum, item) => sum + (item.total_price || 0), 0)
+            });
+        });
+    });
+});
+
+// GET: Buscar produtos por nome ou código
+app.get('/api/products/search', authenticate, (req, res) => {
+    const { q } = req.query;
+    const groupId = req.groupId;
+
+    if (!q) {
+        return res.json([]);
+    }
+
+    const query = `
+        SELECT 
+            p.id,
+            p.name,
+            p.code,
+            p.created_at,
+            GROUP_CONCAT(DISTINCT s.name) as suppliers,
+            AVG(pi.unit_price) as average_price,
+            MAX(pi.unit_price) as last_price,
+            SUM(pi.quantity) as total_quantity,
+            MAX(pur.purchase_date) as last_purchase
+        FROM products p
+        LEFT JOIN purchase_items pi ON p.id = pi.product_id
+        LEFT JOIN purchases pur ON pi.purchase_id = pur.id
+        LEFT JOIN suppliers s ON pur.supplier_id = s.id
+        WHERE p.group_id = ? AND (p.name LIKE ? OR p.code LIKE ?)
+        GROUP BY p.id, p.name, p.code, p.created_at
+        ORDER BY p.name ASC
+    `;
+
+    db.all(query, [groupId, `%${q}%`, `%${q}%`], (err, rows) => {
+        if (err) {
+            console.error('Erro ao buscar produtos no banco de dados:', err.message);
+            return res.status(500).json({ message: 'Erro ao buscar produtos', error: err.message });
+        }
+        
+        // Formatar os dados
+        const formattedRows = rows.map(row => ({
+            ...row,
+            suppliers: row.suppliers || 'N/A',
+            average_price: row.average_price ? parseFloat(row.average_price).toFixed(2) : '0,00',
+            last_price: row.last_price ? parseFloat(row.last_price).toFixed(2) : '0,00',
+            total_quantity: row.total_quantity || 0,
+            last_purchase: row.last_purchase || 'N/A'
+        }));
+        
+        res.json(formattedRows);
+    });
+});
+
+// --- ROTAS DA API DE IMPORTAÇÃO ---
+
+// POST: Upload e processamento de planilha
+app.post('/api/import/spreadsheet', authenticate, upload.single('file'), (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ message: 'Nenhum arquivo foi enviado.' });
+    }
+
+    try {
+        const workbook = XLSX.readFile(req.file.path);
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const data = XLSX.utils.sheet_to_json(worksheet);
+
+        // Valida se as colunas necessárias existem
+        const requiredColumns = ['numero_nota', 'nome_loja', 'codigo_produto', 'nome_produto', 'quantidade', 'valor_unitario', 'total', 'data_compra'];
+        const firstRow = data[0];
+        if (!firstRow) {
+            return res.status(400).json({ message: 'A planilha está vazia.' });
+        }
+
+        const missingColumns = requiredColumns.filter(col => !(col in firstRow));
+        if (missingColumns.length > 0) {
+            return res.status(400).json({ 
+                message: `Colunas obrigatórias não encontradas: ${missingColumns.join(', ')}` 
+            });
+        }
+
+        // Processa os dados da planilha
+        const processedData = data.map((row, index) => {
+            // Processa a data de compra
+            let purchaseDate = '';
+            if (row.data_compra) {
+                const dateValue = row.data_compra;
+                if (typeof dateValue === 'number') {
+                    // Se for um número (Excel serial date), converte para data
+                    const excelDate = new Date((dateValue - 25569) * 86400 * 1000);
+                    purchaseDate = excelDate.toISOString().split('T')[0];
+                } else if (typeof dateValue === 'string') {
+                    // Se for string, tenta converter
+                    const date = new Date(dateValue);
+                    if (!isNaN(date.getTime())) {
+                        purchaseDate = date.toISOString().split('T')[0];
+                    } else {
+                        // Tenta formatos brasileiros comuns
+                        const formats = [
+                            /^(\d{2})\/(\d{2})\/(\d{4})$/,  // DD/MM/YYYY
+                            /^(\d{2})-(\d{2})-(\d{4})$/,  // DD-MM-YYYY
+                            /^(\d{4})-(\d{2})-(\d{2})$/,  // YYYY-MM-DD
+                        ];
+                        
+                        for (const format of formats) {
+                            const match = dateValue.match(format);
+                            if (match) {
+                                if (format === formats[0] || format === formats[1]) {
+                                    // DD/MM/YYYY ou DD-MM-YYYY
+                                    purchaseDate = `${match[3]}-${match[2].padStart(2, '0')}-${match[1].padStart(2, '0')}`;
+                                } else {
+                                    // YYYY-MM-DD
+                                    purchaseDate = match[0];
+                                }
+                                break;
+                            }
+                        }
+                    }
+                } else if (dateValue instanceof Date) {
+                    purchaseDate = dateValue.toISOString().split('T')[0];
+                }
+            }
+
+            return {
+                rowNumber: index + 1,
+                invoiceNumber: row.numero_nota?.toString() || '',
+                storeName: row.nome_loja?.toString() || '',
+                productCode: row.codigo_produto?.toString() || '',
+                productName: row.nome_produto?.toString() || '',
+                quantity: parseFloat(row.quantidade) || 0,
+                unitPrice: parseFloat(row.valor_unitario) || 0,
+                total: parseFloat(row.total) || 0,
+                purchaseDate: purchaseDate
+            };
+        });
+
+        // Agrupa por nota fiscal
+        const invoices = {};
+        processedData.forEach(item => {
+            if (!invoices[item.invoiceNumber]) {
+                invoices[item.invoiceNumber] = {
+                    invoiceNumber: item.invoiceNumber,
+                    storeName: item.storeName,
+                    purchaseDate: item.purchaseDate,
+                    items: [],
+                    totalAmount: 0
+                };
+            }
+            invoices[item.invoiceNumber].items.push(item);
+            invoices[item.invoiceNumber].totalAmount += item.total;
+        });
+
+        const invoiceList = Object.values(invoices);
+
+        res.json({
+            success: true,
+            data: invoiceList,
+            message: `${invoiceList.length} nota(s) fiscal(is) processada(s) com sucesso.`
+        });
+
+    } catch (error) {
+        console.error('Erro ao processar planilha:', error);
+        res.status(500).json({ message: 'Erro ao processar planilha', error: error.message });
+    }
+});
+
+// POST: Finalizar importação e criar compras
+app.post('/api/import/finalize', authenticate, async (req, res) => {
+    const { invoices, accountId, paymentTypeId, categoryId, installmentCount, firstInstallmentDate } = req.body;
+    const groupId = req.groupId;
+    const userId = req.userId;
+
+    if (!invoices || !Array.isArray(invoices) || invoices.length === 0) {
+        return res.status(400).json({ message: 'Dados de importação inválidos.' });
+    }
+
+    if (!accountId || !paymentTypeId || !categoryId) {
+        return res.status(400).json({ message: 'Conta, tipo de pagamento e categoria são obrigatórios.' });
+    }
+
+    try {
+        const results = [];
+
+        for (const invoice of invoices) {
+            // Busca ou cria o fornecedor
+            let supplierId;
+            const existingSupplier = await new Promise((resolve, reject) => {
+                db.get(`SELECT id FROM suppliers WHERE group_id = ? AND name = ?`, [groupId, invoice.storeName], (err, row) => {
+                    if (err) reject(err);
+                    else resolve(row);
+                });
+            });
+
+            if (existingSupplier) {
+                supplierId = existingSupplier.id;
+            } else {
+                const newSupplier = await new Promise((resolve, reject) => {
+                    db.run(`INSERT INTO suppliers (group_id, name) VALUES (?, ?)`, [groupId, invoice.storeName], function(err) {
+                        if (err) reject(err);
+                        else resolve({ id: this.lastID });
+                    });
+                });
+                supplierId = newSupplier.id;
+            }
+
+            // Cria a compra
+            const purchase = await new Promise((resolve, reject) => {
+                db.run(`
+                    INSERT INTO purchases (group_id, user_id, supplier_id, account_id, payment_type_id, invoice_number, total_amount, purchase_date, installment_count, installment_interval_days)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                `, [groupId, userId, supplierId, accountId, paymentTypeId, invoice.invoiceNumber, invoice.totalAmount, invoice.purchaseDate, installmentCount || 1, 30], function(err) {
+                    if (err) reject(err);
+                    else resolve({ id: this.lastID });
+                });
+            });
+
+            // Cria os itens da compra
+            for (const item of invoice.items) {
+                // Busca ou cria o produto
+                let productId;
+                
+                console.log('🔍 === DEBUG: Processando item da compra ===');
+                console.log('📦 Nome do produto:', item.productName);
+                console.log('📦 Código do produto:', item.productCode);
+                console.log('📦 Quantidade:', item.quantity);
+                console.log('📦 Preço unitário:', item.unitPrice);
+                console.log('📦 Total:', item.total);
+                
+                const existingProduct = await new Promise((resolve, reject) => {
+                    db.get(`SELECT id FROM products WHERE group_id = ? AND name = ? AND (code = ? OR (code IS NULL AND ? IS NULL))`, 
+                        [groupId, item.productName, item.productCode || null, item.productCode || null], (err, row) => {
+                        if (err) {
+                            console.error('❌ Erro ao buscar produto existente:', err);
+                            reject(err);
+                        } else {
+                            console.log('🔍 Produto existente encontrado:', row);
+                            resolve(row);
+                        }
+                    });
+                });
+
+                if (existingProduct) {
+                    productId = existingProduct.id;
+                    console.log('✅ Usando produto existente ID:', productId);
+                } else {
+                    console.log('🆕 Criando novo produto...');
+                    const newProduct = await new Promise((resolve, reject) => {
+                        db.run(`INSERT INTO products (group_id, name, code) VALUES (?, ?, ?)`, 
+                            [groupId, item.productName, item.productCode || null], function(err) {
+                            if (err) {
+                                console.error('❌ Erro ao criar produto:', err);
+                                reject(err);
+                            } else {
+                                console.log('✅ Novo produto criado com ID:', this.lastID);
+                                resolve({ id: this.lastID });
+                            }
+                        });
+                    });
+                    productId = newProduct.id;
+                }
+
+                // Cria o item da compra
+                console.log('🔄 Criando item da compra...');
+                console.log('📦 Purchase ID:', purchase.id);
+                console.log('📦 Product ID:', productId);
+                console.log('📦 Quantidade:', item.quantity);
+                console.log('📦 Preço unitário:', item.unitPrice);
+                console.log('📦 Total:', item.total);
+                
+                await new Promise((resolve, reject) => {
+                    db.run(`
+                        INSERT INTO purchase_items (purchase_id, product_id, quantity, unit_price, total_price, product_code, product_name)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                    `, [purchase.id, productId, item.quantity, item.unitPrice, item.total, item.productCode, item.productName], function(err) {
+                        if (err) {
+                            console.error('❌ Erro ao criar item da compra:', err);
+                            reject(err);
+                        } else {
+                            console.log('✅ Item da compra criado com ID:', this.lastID);
+                            resolve();
+                        }
+                    });
+                });
+            }
+
+            // Cria as parcelas se necessário
+            if (installmentCount > 1) {
+                const installmentAmount = invoice.totalAmount / installmentCount;
+                
+                // Determina a data base para as parcelas
+                let baseDate;
+                if (firstInstallmentDate) {
+                    baseDate = new Date(firstInstallmentDate);
+                } else {
+                    baseDate = new Date(invoice.purchaseDate);
+                }
+                
+                for (let i = 1; i <= installmentCount; i++) {
+                    const dueDate = new Date(baseDate);
+                    dueDate.setDate(dueDate.getDate() + ((i - 1) * 30));
+                    
+                    await new Promise((resolve, reject) => {
+                        db.run(`
+                            INSERT INTO purchase_installments (purchase_id, installment_number, amount, due_date)
+                            VALUES (?, ?, ?, ?)
+                        `, [purchase.id, i, installmentAmount, dueDate.toISOString().split('T')[0]], (err) => {
+                            if (err) reject(err);
+                            else resolve();
+                        });
+                    });
+                }
+            }
+
+            // Cria as transações para cada parcela
+            if (installmentCount > 1) {
+                const installmentAmount = invoice.totalAmount / installmentCount;
+                
+                // Determina a data base para as parcelas
+                let baseDate;
+                if (firstInstallmentDate) {
+                    baseDate = new Date(firstInstallmentDate);
+                } else {
+                    baseDate = new Date(invoice.purchaseDate);
+                }
+                
+                for (let i = 1; i <= installmentCount; i++) {
+                    const dueDate = new Date(baseDate);
+                    dueDate.setDate(dueDate.getDate() + ((i - 1) * 30));
+                    
+                    await new Promise((resolve, reject) => {
+                        db.run(`
+                            INSERT INTO transactions (user_id, account_id, description, amount, type, due_date, is_confirmed, payment_type_id, category_id)
+                            VALUES (?, ?, ?, ?, 'expense', ?, 0, ?, ?)
+                        `, [userId, accountId, `Compra ${invoice.invoiceNumber} - Parcela ${i}/${installmentCount}`, installmentAmount, dueDate.toISOString().split('T')[0], paymentTypeId, categoryId], (err) => {
+                            if (err) reject(err);
+                            else resolve();
+                        });
+                    });
+                }
+            } else {
+                // Cria uma única transação à vista
+                await new Promise((resolve, reject) => {
+                    db.run(`
+                        INSERT INTO transactions (user_id, account_id, description, amount, type, due_date, is_confirmed, payment_type_id, category_id)
+                        VALUES (?, ?, ?, ?, 'expense', ?, 0, ?, ?)
+                    `, [userId, accountId, `Compra ${invoice.invoiceNumber}`, invoice.totalAmount, invoice.purchaseDate, paymentTypeId, categoryId], (err) => {
+                        if (err) reject(err);
+                        else resolve();
+                    });
+                });
+            }
+
+            results.push({
+                invoiceNumber: invoice.invoiceNumber,
+                purchaseId: purchase.id,
+                success: true
+            });
+        }
+
+        res.json({
+            success: true,
+            message: `${results.length} compra(s) importada(s) com sucesso.`,
+            results
+        });
+
+    } catch (error) {
+        console.error('Erro ao finalizar importação:', error);
+        res.status(500).json({ message: 'Erro ao finalizar importação', error: error.message });
+    }
+});
+
+// --- ROTAS DA API DE COMPRAS IMPORTADAS ---
+
+// GET: Listar compras importadas
+app.get('/api/purchases', authenticate, (req, res) => {
+    const groupId = req.groupId;
+
+    const query = `
+        SELECT 
+            p.id,
+            p.invoice_number,
+            p.total_amount,
+            p.purchase_date,
+            p.installment_count,
+            p.created_at,
+            s.name as supplier_name,
+            a.name as account_name,
+            pt.name as payment_type_name,
+            COUNT(pi.id) as items_count
+        FROM purchases p
+        LEFT JOIN suppliers s ON p.supplier_id = s.id
+        LEFT JOIN accounts a ON p.account_id = a.id
+        LEFT JOIN payment_types pt ON p.payment_type_id = pt.id
+        LEFT JOIN purchase_items pi ON p.id = pi.purchase_id
+        WHERE p.group_id = ?
+        GROUP BY p.id, p.invoice_number, p.total_amount, p.purchase_date, p.installment_count, p.created_at, s.name, a.name, pt.name
+        ORDER BY p.created_at DESC
+    `;
+
+    db.all(query, [groupId], (err, rows) => {
+        if (err) {
+            console.error('Erro ao buscar compras no banco de dados:', err.message);
+            return res.status(500).json({ message: 'Erro ao buscar compras', error: err.message });
+        }
+        res.json(rows);
+    });
+});
+
+// GET: Buscar compra por ID com detalhes
+app.get('/api/purchases/:id', authenticate, (req, res) => {
+    const { id } = req.params;
+    const groupId = req.groupId;
+
+    const query = `
+        SELECT 
+            p.*,
+            s.name as supplier_name,
+            a.name as account_name,
+            pt.name as payment_type_name
+        FROM purchases p
+        LEFT JOIN suppliers s ON p.supplier_id = s.id
+        LEFT JOIN accounts a ON p.account_id = a.id
+        LEFT JOIN payment_types pt ON p.payment_type_id = pt.id
+        WHERE p.id = ? AND p.group_id = ?
+    `;
+
+    db.get(query, [id, groupId], (err, row) => {
+        if (err) {
+            console.error('Erro ao buscar compra no banco de dados:', err.message);
+            return res.status(500).json({ message: 'Erro ao buscar compra', error: err.message });
+        }
+        if (!row) {
+            return res.status(404).json({ message: 'Compra não encontrada' });
+        }
+        res.json(row);
+    });
+});
+
+// GET: Buscar itens de uma compra
+app.get('/api/purchases/:id/items', authenticate, (req, res) => {
+    const { id } = req.params;
+    const groupId = req.groupId;
+
+    const query = `
+        SELECT 
+            pi.*,
+            p.name as product_name
+        FROM purchase_items pi
+        LEFT JOIN products p ON pi.product_id = p.id
+        LEFT JOIN purchases pur ON pi.purchase_id = pur.id
+        WHERE pi.purchase_id = ? AND pur.group_id = ?
+        ORDER BY pi.id
+    `;
+
+    db.all(query, [id, groupId], (err, rows) => {
+        if (err) {
+            console.error('Erro ao buscar itens da compra no banco de dados:', err.message);
+            return res.status(500).json({ message: 'Erro ao buscar itens da compra', error: err.message });
+        }
+        res.json(rows);
+    });
+});
+
+// DELETE: Deletar compra e todos os dados relacionados
+app.delete('/api/purchases/:id', authenticate, async (req, res) => {
+    const { id } = req.params;
+    const groupId = req.groupId;
+
+    try {
+        // Verifica se a compra existe e pertence ao grupo
+        const purchase = await new Promise((resolve, reject) => {
+            db.get(`SELECT id FROM purchases WHERE id = ? AND group_id = ?`, [id, groupId], (err, row) => {
+                if (err) reject(err);
+                else resolve(row);
+            });
+        });
+
+        if (!purchase) {
+            return res.status(404).json({ message: 'Compra não encontrada' });
+        }
+
+        // Deleta as parcelas primeiro
+        await new Promise((resolve, reject) => {
+            db.run(`DELETE FROM purchase_installments WHERE purchase_id = ?`, [id], (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+
+        // Deleta os itens da compra
+        await new Promise((resolve, reject) => {
+            db.run(`DELETE FROM purchase_items WHERE purchase_id = ?`, [id], (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+
+        // Deleta as transações relacionadas
+        await new Promise((resolve, reject) => {
+            db.run(`DELETE FROM transactions WHERE description LIKE ? AND account_id IN (SELECT id FROM accounts WHERE group_id = ?)`, 
+                [`%Compra ${purchase.invoice_number}%`, groupId], (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+
+        // Deleta a compra
+        await new Promise((resolve, reject) => {
+            db.run(`DELETE FROM purchases WHERE id = ?`, [id], (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+
+        res.json({ message: 'Compra deletada com sucesso!' });
+
+    } catch (error) {
+        console.error('Erro ao deletar compra:', error);
+        res.status(500).json({ message: 'Erro ao deletar compra', error: error.message });
+    }
 });
 
 // --- ROTAS DA API DE USUÁRIOS ---

@@ -209,6 +209,20 @@ header {
     padding: 0 10px; /* Padding horizontal sutil */
 }
 
+/* Estilos para o modal de importação */
+.import-step {
+    min-height: 300px;
+}
+
+#import-invoices-list {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+#import-summary {
+    font-size: 0.9rem;
+}
+
 .page-content.hidden {
     display: none;
 }
@@ -500,4 +514,216 @@ header {
 .container-fluid {
     padding-left: 15px;
     padding-right: 15px;
+}
+
+/* Melhorias para tabelas */
+.table th {
+    white-space: nowrap;
+    vertical-align: middle;
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+.table td {
+    vertical-align: middle;
+    font-size: 0.875rem;
+}
+
+.table-sm th,
+.table-sm td {
+    padding: 0.5rem 0.75rem;
+}
+
+/* Ajustes específicos para colunas de valores */
+.text-end {
+    text-align: right !important;
+}
+
+.text-center {
+    text-align: center !important;
+}
+
+.text-start {
+    text-align: left !important;
+}
+
+/* Garantir que as colunas mantenham suas larguras */
+.table th[style*="width"],
+.table td[style*="width"] {
+    min-width: 0;
+    max-width: none;
+}
+
+/* Ajustes para responsividade das tabelas */
+@media (max-width: 768px) {
+    .table-responsive {
+        font-size: 0.8rem;
+    }
+    
+    .table th,
+    .table td {
+        padding: 0.25rem 0.5rem;
+    }
+    
+    .table th[style*="width"],
+    .table td[style*="width"] {
+        width: auto !important;
+    }
+}
+
+/* Garantir que o campo de data da primeira parcela seja visível */
+#first-installment-date {
+    display: block !important;
+    visibility: visible !important;
+}
+
+/* Estilos para o modal de detalhes do produto */
+#productDetailsModal .modal-xl {
+    max-width: 95%;
+}
+
+#productDetailsModal .card {
+    border: 1px solid #dee2e6;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+#productDetailsModal .card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    font-weight: 600;
+}
+
+#productDetailsModal .card-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+#productDetailsModal .text-primary {
+    color: #0d6efd !important;
+}
+
+#productDetailsModal .text-success {
+    color: #198754 !important;
+}
+
+#productDetailsModal .text-info {
+    color: #0dcaf0 !important;
+}
+
+#productDetailsModal .text-warning {
+    color: #ffc107 !important;
+}
+
+#productDetailsModal .table th {
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+#productDetailsModal .table td {
+    font-size: 0.875rem;
+    vertical-align: middle;
+}
+
+#productDetailsModal .table-responsive {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+#no-purchase-history {
+    color: #6c757d;
+}
+
+/* Estilos para o modal de comparação de produtos */
+#productComparisonModal .modal-xl {
+    max-width: 95%;
+}
+
+#productComparisonModal .card {
+    border: 1px solid #dee2e6;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    margin-bottom: 1rem;
+}
+
+#productComparisonModal .card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    font-weight: 600;
+}
+
+#productComparisonModal .card.border-primary {
+    border-color: #0d6efd !important;
+}
+
+#productComparisonModal .card.border-success {
+    border-color: #198754 !important;
+}
+
+#productComparisonModal .badge {
+    font-size: 0.75rem;
+    margin: 0 2px;
+}
+
+#productComparisonModal .table th {
+    font-weight: 600;
+    font-size: 0.875rem;
+    background-color: #212529;
+    color: white;
+}
+
+#productComparisonModal .table td {
+    font-size: 0.875rem;
+    vertical-align: middle;
+}
+
+#productComparisonModal .table-responsive {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+#productComparisonModal .alert-info {
+    background-color: #d1ecf1;
+    border-color: #bee5eb;
+    color: #0c5460;
+}
+
+#no-purchase-history i {
+    opacity: 0.5;
+}
+
+/* Ajustes para o modal de importação */
+.import-step {
+    min-height: 300px;
+}
+
+.import-step .col-md-4 {
+    margin-bottom: 1rem;
+}
+
+/* Estilos para o rodapé */
+.footer {
+    background-color: #f8f9fa !important;
+    border-top: 1px solid #dee2e6 !important;
+    margin-top: auto;
+    padding: 1rem 0;
+}
+
+.footer small {
+    font-size: 0.875rem;
+    color: #6c757d;
+}
+
+.footer strong {
+    color: #495057;
+    font-weight: 600;
+}
+
+/* Garantir que o rodapé fique sempre visível */
+#main-app {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+#main-content {
+    flex: 1;
 }

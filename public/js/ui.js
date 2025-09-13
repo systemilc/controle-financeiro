@@ -111,6 +111,20 @@ export const elements = {
     paymentTypesList: document.getElementById('payment-types-list'),
     paymentTypeSelect: document.getElementById('payment-type-select'), // Select de tipos de pagamento no formulário de transações
     
+    // Importação de Planilhas
+    importModal: document.getElementById('importModal'),
+    spreadsheetFile: document.getElementById('spreadsheetFile'),
+    importInvoicesList: document.getElementById('import-invoices-list'),
+    invoiceCount: document.getElementById('invoice-count'),
+    importAccountSelect: document.getElementById('import-account-select'),
+    importPaymentTypeSelect: document.getElementById('import-payment-type-select'),
+    importCategorySelect: document.getElementById('import-category-select'),
+    installmentCount: document.getElementById('installment-count'),
+    firstInstallmentDate: document.getElementById('first-installment-date'),
+    importSummary: document.getElementById('import-summary'),
+    importNextBtn: document.getElementById('import-next-btn'),
+    importFinalizeBtn: document.getElementById('import-finalize-btn'),
+    
     // Filtros de Transações
     transactionFiltersForm: document.getElementById('transaction-filters-form'),
     filterDateRangeStart: document.getElementById('filter-date-range-start'),
@@ -288,6 +302,9 @@ export const render = {
             'contas': 'Contas Bancárias',
             'categorias': 'Categorias',
             'tipos-pagamento': 'Tipos de Pagamento',
+            'importar-compra': 'Importar Compra',
+            'compras-importadas': 'Compras Importadas',
+            'produtos': 'Produtos',
             'transacoes': 'Transações',
             'usuarios': 'Usuários do Grupo',
             'transferencia': 'Transferência de Saldo',
@@ -998,6 +1015,411 @@ export const render = {
             option.value = paymentType.id;
             option.textContent = paymentType.name;
             elements.paymentTypeSelect.appendChild(option);
+        });
+    },
+
+    // Importação de Planilhas
+    renderImportInvoices: (invoices) => {
+        elements.importInvoicesList.innerHTML = '';
+        elements.invoiceCount.textContent = `${invoices.length} nota(s) fiscal(is)`;
+
+        invoices.forEach(invoice => {
+            const tr = document.createElement('tr');
+            
+            // Formata a data para exibição
+            let displayDate = 'Data Inválida';
+            let dateClass = 'text-danger';
+            
+            if (invoice.purchaseDate) {
+                try {
+                    const date = new Date(invoice.purchaseDate);
+                    if (!isNaN(date.getTime())) {
+                        displayDate = date.toLocaleDateString('pt-BR');
+                        dateClass = 'text-success';
+                    } else {
+                        displayDate = invoice.purchaseDate; // Mostra o valor original
+                    }
+                } catch (e) {
+                    displayDate = invoice.purchaseDate; // Mostra o valor original
+                }
+            }
+            
+            tr.innerHTML = `
+                <td class="text-center">${invoice.invoiceNumber}</td>
+                <td class="text-start">${invoice.storeName}</td>
+                <td class="text-center ${dateClass}">${displayDate}</td>
+                <td class="text-end">R$ ${parseFloat(invoice.totalAmount).toFixed(2).replace('.', ',')}</td>
+                <td class="text-center">${invoice.items.length}</td>
+            `;
+            elements.importInvoicesList.appendChild(tr);
+        });
+
+        // Renderizar produtos para associação
+        console.log('Chamando renderImportProducts com invoices:', invoices);
+        render.renderImportProducts(invoices);
+    },
+
+    renderImportProducts: (invoices) => {
+        console.log('renderImportProducts chamada com:', invoices);
+        const productsList = document.getElementById('import-products-list');
+        console.log('Elemento productsList encontrado:', productsList);
+        
+        if (!productsList) {
+            console.error('Elemento import-products-list não encontrado!');
+            return;
+        }
+
+        productsList.innerHTML = '';
+        
+        // Coletar todos os produtos únicos das notas fiscais
+        const allProducts = new Map();
+        console.log('Processando invoices:', invoices.length);
+        
+        // Armazenar produtos globalmente para acesso posterior
+        window.currentImportProducts = {};
+        
+        invoices.forEach((invoice, invoiceIndex) => {
+            console.log(`Invoice ${invoiceIndex}:`, invoice);
+            if (invoice.items && invoice.items.length > 0) {
+                invoice.items.forEach((item, itemIndex) => {
+                    console.log(`Item ${itemIndex}:`, item);
+                    const key = `${item.productCode}-${item.productName}`;
+                    if (!allProducts.has(key)) {
+                        allProducts.set(key, {
+                            name: item.productName,
+                            code: item.productCode,
+                            unitPrice: item.unitPrice,
+                            quantity: item.quantity,
+                            suppliers: new Set([invoice.storeName]),
+                            storeName: invoice.storeName,
+                            purchaseDate: invoice.purchaseDate,
+                            invoiceNumber: invoice.invoiceNumber
+                        });
+                    } else {
+                        const existing = allProducts.get(key);
+                        existing.suppliers.add(invoice.storeName);
+                        existing.quantity += item.quantity;
+                    }
+                });
+            } else {
+                console.log(`Invoice ${invoiceIndex} não tem items:`, invoice);
+            }
+        });
+        
+        console.log('Produtos únicos coletados:', allProducts.size);
+
+        // Renderizar produtos
+        let index = 1;
+        console.log('Iniciando renderização de produtos...');
+        
+        allProducts.forEach((product, key) => {
+            console.log(`Renderizando produto ${index}:`, product);
+            const tr = document.createElement('tr');
+            const safeKey = `product_${index}_${key.replace(/[^a-zA-Z0-9]/g, '_')}`;
+            
+            // Armazenar dados do produto para uso posterior
+            window.currentImportProducts[safeKey] = {
+                ...product,
+                suppliers: Array.from(product.suppliers || [])
+            };
+            
+            tr.innerHTML = `
+                <td class="text-center">${index++}</td>
+                <td class="text-start">${product.name}</td>
+                <td class="text-center">${product.code}</td>
+                <td class="text-end">R$ ${parseFloat(product.unitPrice).toFixed(2).replace('.', ',')}</td>
+                <td class="text-center">${product.quantity}</td>
+                <td class="text-start">
+                    <div class="input-group input-group-sm">
+                        <select class="form-select" id="associate-${safeKey}" 
+                                style="max-height: 200px; font-size: 0.875rem;"
+                                onchange="showProductComparison('${safeKey}', this.value)">
+                            <option value="">Novo produto</option>
+                        </select>
+                        <button class="btn btn-outline-secondary" type="button" 
+                                onclick="loadAllProductsForSelect('${safeKey}')"
+                                title="Carregar todos os produtos">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                    </div>
+                </td>
+                <td class="text-center">
+                    <button class="btn btn-sm btn-outline-primary search-product-btn" 
+                            data-key="${safeKey}" 
+                            data-name="${product.name.replace(/"/g, '&quot;')}" 
+                            data-code="${product.code.replace(/"/g, '&quot;')}">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </td>
+            `;
+            productsList.appendChild(tr);
+            console.log(`Produto ${index-1} adicionado à tabela`);
+        });
+        
+        console.log(`Total de produtos renderizados: ${allProducts.size}`);
+
+        // Carregar automaticamente todos os produtos nos selects
+        setTimeout(() => {
+            let index = 1;
+            allProducts.forEach((product, key) => {
+                const safeKey = `product_${index}_${key.replace(/[^a-zA-Z0-9]/g, '_')}`;
+                loadAllProductsForSelect(safeKey);
+                index++;
+            });
+        }, 200);
+
+        // Adicionar event listeners para os botões de busca
+        setTimeout(() => {
+            const searchButtons = productsList.querySelectorAll('.search-product-btn');
+            searchButtons.forEach(button => {
+                button.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const key = button.getAttribute('data-key');
+                    const name = button.getAttribute('data-name');
+                    const code = button.getAttribute('data-code');
+                    console.log('Botão clicado:', { key, name, code });
+                    window.searchExistingProducts(key, name, code);
+                });
+            });
+        }, 100);
+    },
+
+    populateImportSelects: (accounts, paymentTypes, categories) => {
+        // Popula select de contas
+        elements.importAccountSelect.innerHTML = '<option value="">Selecione a conta</option>';
+        accounts.forEach(account => {
+            const option = document.createElement('option');
+            option.value = account.id;
+            option.textContent = account.name;
+            elements.importAccountSelect.appendChild(option);
+        });
+
+        // Popula select de tipos de pagamento (apenas para despesas)
+        elements.importPaymentTypeSelect.innerHTML = '<option value="">Selecione o tipo</option>';
+        const expensePaymentTypes = paymentTypes.filter(pt => pt.is_expense);
+        expensePaymentTypes.forEach(paymentType => {
+            const option = document.createElement('option');
+            option.value = paymentType.id;
+            option.textContent = paymentType.name;
+            elements.importPaymentTypeSelect.appendChild(option);
+        });
+
+        // Popula select de categorias (apenas para despesas)
+        elements.importCategorySelect.innerHTML = '<option value="">Selecione a categoria</option>';
+        if (categories) {
+            const expenseCategories = categories.filter(cat => cat.type === 'expense');
+            expenseCategories.forEach(category => {
+                const option = document.createElement('option');
+                option.value = category.id;
+                option.textContent = category.name;
+                elements.importCategorySelect.appendChild(option);
+            });
+        }
+    },
+
+    updateImportSummary: (invoices, installmentCount) => {
+        const totalInvoices = invoices.length;
+        const totalAmount = invoices.reduce((sum, invoice) => sum + invoice.totalAmount, 0);
+        const totalItems = invoices.reduce((sum, invoice) => sum + invoice.items.length, 0);
+        const installmentAmount = installmentCount > 1 ? totalAmount / installmentCount : totalAmount;
+
+        elements.importSummary.innerHTML = `
+            <div><strong>${totalInvoices}</strong> nota(s) fiscal(is)</div>
+            <div><strong>${totalItems}</strong> item(ns)</div>
+            <div><strong>R$ ${parseFloat(totalAmount).toFixed(2).replace('.', ',')}</strong> total</div>
+            ${installmentCount > 1 ? `<div><strong>${installmentCount}</strong> parcelas de <strong>R$ ${parseFloat(installmentAmount).toFixed(2).replace('.', ',')}</strong></div>` : ''}
+        `;
+    },
+
+    showImportStep: (stepNumber) => {
+        // Esconde todas as etapas
+        document.querySelectorAll('.import-step').forEach(step => {
+            step.style.display = 'none';
+        });
+        
+        // Mostra a etapa atual
+        const currentStep = document.getElementById(`import-step-${stepNumber}`);
+        if (currentStep) {
+            currentStep.style.display = 'block';
+        } else {
+            console.error(`Elemento import-step-${stepNumber} não encontrado`);
+            return;
+        }
+        
+        // Atualiza botões
+        if (stepNumber === 1) {
+            elements.importNextBtn.style.display = 'inline-block';
+            elements.importFinalizeBtn.style.display = 'none';
+            elements.importNextBtn.textContent = 'Próximo';
+        } else if (stepNumber === 2) {
+            elements.importNextBtn.style.display = 'inline-block';
+            elements.importFinalizeBtn.style.display = 'none';
+            elements.importNextBtn.textContent = 'Próximo';
+        } else if (stepNumber === 3) {
+            elements.importNextBtn.style.display = 'none';
+            elements.importFinalizeBtn.style.display = 'inline-block';
+        }
+    },
+
+    resetImportModal: () => {
+        elements.spreadsheetFile.value = '';
+        elements.importInvoicesList.innerHTML = '';
+        elements.invoiceCount.textContent = '0 notas fiscais';
+        elements.importAccountSelect.value = '';
+        elements.importPaymentTypeSelect.value = '';
+        elements.importCategorySelect.value = '';
+        elements.installmentCount.value = '1';
+        elements.firstInstallmentDate.value = '';
+        elements.importSummary.textContent = '-';
+        render.showImportStep(1);
+    },
+
+    showProductDetailsModal: (product, purchaseHistory, associatedProducts = []) => {
+        // Preencher informações básicas
+        document.getElementById('product-name').textContent = product.name;
+        document.getElementById('product-code').textContent = product.code;
+        document.getElementById('product-created').textContent = product.created_at;
+        document.getElementById('product-suppliers').textContent = product.suppliers;
+
+        // Preencher estatísticas
+        document.getElementById('product-total-quantity').textContent = product.total_quantity;
+        document.getElementById('product-average-price').textContent = `R$ ${product.average_price}`;
+        document.getElementById('product-last-price').textContent = `R$ ${product.last_price}`;
+        document.getElementById('product-last-purchase').textContent = product.last_purchase;
+
+        // Preencher melhor fornecedor
+        const bestSupplierSection = document.getElementById('best-supplier-section');
+        if (product.min_price_supplier) {
+            document.getElementById('best-supplier-name').textContent = product.min_price_supplier.name;
+            document.getElementById('best-supplier-price').textContent = `R$ ${product.min_price_supplier.price}`;
+            document.getElementById('best-supplier-date').textContent = product.min_price_supplier.date;
+            bestSupplierSection.style.display = 'block';
+        } else {
+            bestSupplierSection.style.display = 'none';
+        }
+
+        // Mostrar produtos associados se existirem
+        const associatedProductsSection = document.getElementById('associated-products-section');
+        if (associatedProducts && associatedProducts.length > 0) {
+            const associatedProductsList = document.getElementById('associated-products-list');
+            associatedProductsList.innerHTML = '';
+            
+            associatedProducts.forEach(associatedProduct => {
+                const item = document.createElement('div');
+                item.className = 'badge bg-info me-2 mb-2';
+                item.textContent = `${associatedProduct.name} (${associatedProduct.code})`;
+                associatedProductsList.appendChild(item);
+            });
+            
+            associatedProductsSection.style.display = 'block';
+        } else {
+            associatedProductsSection.style.display = 'none';
+        }
+
+        // Preencher histórico de compras
+        const historyTable = document.getElementById('product-purchase-history');
+        const noHistoryDiv = document.getElementById('no-purchase-history');
+        
+        historyTable.innerHTML = '';
+        
+        if (purchaseHistory && purchaseHistory.length > 0) {
+            noHistoryDiv.style.display = 'none';
+            
+            purchaseHistory.forEach(item => {
+                const tr = document.createElement('tr');
+                const isAssociatedProduct = item.product_name && item.product_name !== product.name;
+                const productInfo = isAssociatedProduct ? 
+                    `<span class="badge bg-info me-1">${item.product_name}</span>` : 
+                    '';
+                
+                tr.innerHTML = `
+                    <td class="text-center">${productInfo}${item.invoice_number}</td>
+                    <td class="text-start">${item.supplier_name}</td>
+                    <td class="text-center">${item.purchase_date}</td>
+                    <td class="text-center">${item.quantity}</td>
+                    <td class="text-end">R$ ${item.unit_price}</td>
+                    <td class="text-end">R$ ${item.total}</td>
+                    <td class="text-start">${item.account_name}</td>
+                    <td class="text-start">${item.payment_type_name}</td>
+                `;
+                historyTable.appendChild(tr);
+            });
+        } else {
+            noHistoryDiv.style.display = 'block';
+        }
+
+        // Mostrar o modal
+        const modal = new bootstrap.Modal(document.getElementById('productDetailsModal'));
+        modal.show();
+    },
+
+    // Produtos
+    renderProductsList: (products) => {
+        const productsList = document.getElementById('products-list');
+        if (!productsList) return;
+
+        productsList.innerHTML = '';
+        
+        if (!products || products.length === 0) {
+            productsList.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Nenhum produto encontrado.</td></tr>';
+            return;
+        }
+
+        products.forEach(product => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="text-start">${product.name}</td>
+                <td class="text-center">${product.code || 'N/A'}</td>
+                <td class="text-end">R$ ${product.last_price || '0,00'}</td>
+                <td class="text-center">${product.total_quantity || 0}</td>
+                <td class="text-end">R$ ${product.average_price || '0,00'}</td>
+                <td class="text-center">${product.last_purchase || 'N/A'}</td>
+                <td class="text-center">
+                    <button class="btn btn-sm btn-info" onclick="viewProductDetails(${product.id})" title="Ver Detalhes">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </td>
+            `;
+            productsList.appendChild(tr);
+        });
+    },
+
+    // Compras Importadas
+    renderPurchasesList: (purchases) => {
+        const purchasesList = document.getElementById('purchases-list');
+        if (!purchasesList) return;
+
+        purchasesList.innerHTML = '';
+        
+        if (!purchases || purchases.length === 0) {
+            purchasesList.innerHTML = '<tr><td colspan="9" class="text-center text-muted">Nenhuma compra importada encontrada.</td></tr>';
+            return;
+        }
+
+        purchases.forEach(purchase => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="text-center">${purchase.invoice_number}</td>
+                <td class="text-start">${purchase.supplier_name || 'N/A'}</td>
+                <td class="text-center">${formatDateForDisplay(purchase.purchase_date)}</td>
+                <td class="text-end">R$ ${parseFloat(purchase.total_amount).toFixed(2).replace('.', ',')}</td>
+                <td class="text-center">${purchase.installment_count || 1}</td>
+                <td class="text-center">${purchase.items_count || 0}</td>
+                <td class="text-start">${purchase.account_name || 'N/A'}</td>
+                <td class="text-start">${purchase.payment_type_name || 'N/A'}</td>
+                <td class="text-center">
+                    <button class="btn btn-sm btn-info me-1" onclick="viewPurchaseDetails(${purchase.id})" title="Ver Detalhes">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    <button class="btn btn-sm btn-warning me-1" onclick="editPurchase(${purchase.id})" title="Editar">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-sm btn-danger" onclick="deletePurchase(${purchase.id}, '${purchase.invoice_number}')" title="Deletar">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            `;
+            purchasesList.appendChild(tr);
         });
     },
 };
