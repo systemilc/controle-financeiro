@@ -698,3 +698,32 @@ header {
 .import-step .col-md-4 {
     margin-bottom: 1rem;
 }
+
+/* Estilos para o rodapé */
+.footer {
+    background-color: #f8f9fa !important;
+    border-top: 1px solid #dee2e6 !important;
+    margin-top: auto;
+    padding: 1rem 0;
+}
+
+.footer small {
+    font-size: 0.875rem;
+    color: #6c757d;
+}
+
+.footer strong {
+    color: #495057;
+    font-weight: 600;
+}
+
+/* Garantir que o rodapé fique sempre visível */
+#main-app {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+#main-content {
+    flex: 1;
+}

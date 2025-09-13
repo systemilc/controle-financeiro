@@ -1361,7 +1361,7 @@ export const render = {
         productsList.innerHTML = '';
         
         if (!products || products.length === 0) {
-            productsList.innerHTML = '<tr><td colspan="8" class="text-center text-muted">Nenhum produto encontrado.</td></tr>';
+            productsList.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Nenhum produto encontrado.</td></tr>';
             return;
         }
 
@@ -1370,7 +1370,6 @@ export const render = {
             tr.innerHTML = `
                 <td class="text-start">${product.name}</td>
                 <td class="text-center">${product.code || 'N/A'}</td>
-                <td class="text-start">${product.suppliers || 'N/A'}</td>
                 <td class="text-end">R$ ${product.last_price || '0,00'}</td>
                 <td class="text-center">${product.total_quantity || 0}</td>
                 <td class="text-end">R$ ${product.average_price || '0,00'}</td>
