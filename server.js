@@ -1177,6 +1177,30 @@ app.get('/api/products', authenticate, (req, res) => {
     });
 });
 
+// PUT: Atualizar um produto
+app.put('/api/products/:id', authenticate, (req, res) => {
+    const { id } = req.params;
+    const { name, code } = req.body;
+    const groupId = req.groupId;
+
+    if (!name) {
+        return res.status(400).json({ message: 'Nome do produto é obrigatório.' });
+    }
+
+    db.run(`UPDATE products SET name = ?, code = ? WHERE id = ? AND group_id = ?`, 
+        [name, code || null, id, groupId], 
+        function(err) {
+            if (err) {
+                console.error('Erro ao atualizar produto no banco de dados:', err.message);
+                return res.status(500).json({ message: 'Erro ao atualizar produto', error: err.message });
+            }
+            if (this.changes === 0) {
+                return res.status(404).json({ message: 'Produto não encontrado ou sem permissão para editar.' });
+            }
+            res.status(200).json({ message: 'Produto atualizado com sucesso!' });
+        });
+});
+
 // GET: Buscar detalhes completos de um produto
 app.get('/api/products/:id/details', authenticate, (req, res) => {
     const productId = req.params.id;

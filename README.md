@@ -1,6 +1,9 @@
+sistema de controle financeiro criado com node (codigicação feita com ia para fins de estudos) (Sistema todo desenvolvido utilizando Prompts próprios).
+
 # Sistema de Controle Financeiro - Multi-Contas
 
 Um sistema completo e robusto para gerenciar finanças pessoais e de grupo, desenvolvido com foco na usabilidade, segurança e colaboração. A aplicação é construída com uma arquitetura **full-stack**, garantindo que os dados sejam armazenados de forma persistente e possam ser acessados de diferentes dispositivos.
+
 
 ---
 
@@ -65,11 +68,13 @@ Um sistema completo e robusto para gerenciar finanças pessoais e de grupo, dese
 
 ### 📦 Gestão de Produtos
 - **Cadastro automático**: Produtos criados via importação
+- **Edição manual**: Modificação de nome e código dos produtos
 - **Histórico de compras**: Rastreamento completo por produto
 - **Comparação de preços**: Análise entre fornecedores
 - **Produtos associados**: Unificação de produtos similares
 - **Estatísticas avançadas**: Preço médio, última compra, fornecedores
 - **Busca inteligente**: Filtros por nome e código
+- **Interface intuitiva**: Modal de edição com validação
 
 ### 🛒 Compras Importadas
 - **Visualização completa**: Lista de todas as compras importadas
@@ -186,6 +191,7 @@ Abra seu navegador e acesse: **http://localhost:3000**
 
 #### 📦 Produtos
 - Listagem de produtos importados
+- Edição de nome e código dos produtos
 - Histórico de compras por produto
 - Comparação de preços entre fornecedores
 - Unificação de produtos similares
@@ -313,8 +319,18 @@ npm install  # Instala dependências
 ✅ **Sistema de usuários e grupos**
 ✅ **Conformidade com LGPD**
 ✅ **Status ativo/inativo para tipos de pagamento**
+✅ **Edição de produtos com interface intuitiva**
 
 ## 🔄 Atualizações Recentes
+
+### v1.2.0 - Edição de Produtos
+- **Novo**: Funcionalidade de edição de produtos
+- **Novo**: Modal intuitivo para editar nome e código
+- **Novo**: Botão de edição na tabela de produtos
+- **Novo**: Validação de dados no frontend e backend
+- **Melhoria**: Fechamento automático do modal após salvar
+- **Melhoria**: Atualização automática da lista após edição
+- **Correção**: Posicionamento correto do modal na estrutura HTML
 
 ### v1.1.0 - Status de Tipos de Pagamento
 - **Novo**: Campo `is_active` para tipos de pagamento
@@ -326,19 +342,36 @@ npm install  # Instala dependências
 
 ---
 
-## 📄 Licença
+## 📄 Licença e Direitos Autorais
 
-Este projeto está sob a licença ISC.
+⚠️ **IMPORTANTE - DIREITOS AUTORAIS**
+
+Este sistema de controle financeiro é **PROPRIEDADE INTELECTUAL** e está protegido por direitos autorais.
+
+### 🚫 **Restrições de Uso:**
+- ❌ **REPRODUÇÃO PROIBIDA** sem autorização expressa
+- ❌ **CÓPIA PROIBIDA** sem consentimento do desenvolvedor
+- ❌ **DISTRIBUIÇÃO PROIBIDA** sem permissão escrita
+- ❌ **MODIFICAÇÃO PROIBIDA** sem autorização prévia
+
+### ✅ **Para Solicitar Autorização:**
+**WhatsApp:** 73 9 9871 8725
+
+Toda reprodução, cópia, distribuição ou modificação deste sistema deve ser previamente autorizada pelo desenvolvedor através do contato acima.
 
 ---
 
 ## 👨‍💻 Desenvolvido por
 
+**Isaac** - Desenvolvedor Full-Stack  
 Sistema desenvolvido com foco na experiência do usuário e robustez técnica.
 
----
+**Contato:** WhatsApp 73 9 9871 8725
 
 ---
 
-**Smartvirtua Informática** - Todos os direitos reservados - 2025  
-**Versão do sistema:** 1.0.0
+---
+
+**© 2025 Isaac - Todos os direitos reservados**  
+**Versão do sistema:** 1.2.0  
+**Licença:** PROPRIETÁRIA - Uso restrito

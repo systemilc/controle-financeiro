@@ -1377,3 +1377,30 @@
         </div>
     </div>
 </div>
+
+<!-- Modal de Edição de Produto -->
+<div class="modal fade" id="editProductModal" tabindex="-1" aria-labelledby="editProductModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editProductModalLabel">Editar Produto</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="edit-product-form">
+                    <div class="mb-3">
+                        <label for="edit-product-name" class="form-label">Nome do Produto:</label>
+                        <input type="text" class="form-control" id="edit-product-name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-product-code" class="form-label">Código do Produto:</label>
+                        <input type="text" class="form-control" id="edit-product-code">
+                        <div class="form-text">Deixe em branco se não houver código</div>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Salvar Alterações</button>
+                    <p id="edit-product-error-message" class="text-danger text-center mt-3 hidden"></p>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

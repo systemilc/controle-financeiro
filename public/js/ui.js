@@ -177,6 +177,13 @@ export const elements = {
     changePasswordConfirmNewPasswordInput: document.getElementById('confirm-new-password'), // Renomeado
     changePasswordErrorMessage: document.getElementById('change-password-error-message'),
     newPasswordStrength: document.getElementById('new-password-strength'),
+
+    // Edição de Produto (Modal)
+    editProductModal: document.getElementById('editProductModal'),
+    editProductForm: document.getElementById('edit-product-form'),
+    editProductNameInput: document.getElementById('edit-product-name'),
+    editProductCodeInput: document.getElementById('edit-product-code'),
+    editProductErrorMessage: document.getElementById('edit-product-error-message'),
 };
 
 // Função auxiliar para renderizar o resumo detalhado
@@ -1383,8 +1390,11 @@ export const render = {
                 <td class="text-end">R$ ${product.average_price || '0,00'}</td>
                 <td class="text-center">${product.last_purchase || 'N/A'}</td>
                 <td class="text-center">
-                    <button class="btn btn-sm btn-info" onclick="viewProductDetails(${product.id})" title="Ver Detalhes">
+                    <button class="btn btn-sm btn-info me-1" onclick="viewProductDetails(${product.id})" title="Ver Detalhes">
                         <i class="fas fa-eye"></i>
+                    </button>
+                    <button class="btn btn-sm btn-warning edit-product-button" data-id="${product.id}" data-name="${product.name.replace(/"/g, '&quot;').replace(/'/g, '&#39;')}" data-code="${(product.code || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;')}" title="Editar Produto">
+                        <i class="fas fa-edit"></i>
                     </button>
                 </td>
             `;
@@ -1433,7 +1443,7 @@ export const render = {
 };
 
 // Função para gerar cores aleatórias (para os gráficos)
-function generateColors(numColors) {
+export function generateColors(numColors) {
     const colors = [];
     for (let i = 0; i < numColors; i++) {
         const hue = (i * 137 + 50) % 360; // Usa um algoritmo para distribuir as cores

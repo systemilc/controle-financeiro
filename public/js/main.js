@@ -3,6 +3,7 @@ import { api } from './api.js';
 import { elements, render } from './ui.js';
 import { getTodayDate, addMonthsToDate } from './utils.js';
 
+
 const fetchAllData = async () => {
     try {
         // Verifica se o usuário está logado antes de fazer as chamadas
@@ -1290,6 +1291,82 @@ elements.paymentTypesList.addEventListener('click', async (e) => {
 if (elements.changePasswordModal) {
     elements.changePasswordModal.addEventListener('hidden.bs.modal', render.resetChangePasswordForm);
 }
+
+// Função para resetar o formulário de edição de produto
+const resetEditProductForm = () => {
+    elements.editProductForm.reset();
+    elements.editProductForm.removeAttribute('data-editing-id');
+    elements.editProductErrorMessage.classList.add('hidden');
+};
+
+// Função para lidar com o envio do formulário de edição de produto
+const handleEditProductSubmit = async (e) => {
+    e.preventDefault();
+    const productName = elements.editProductNameInput.value;
+    const productCode = elements.editProductCodeInput.value;
+    const productId = elements.editProductForm.dataset.editingId;
+
+    if (!productName) {
+        alert('Por favor, preencha o nome do produto.');
+        return;
+    }
+
+    try {
+        const success = await api.editProduct(productId, productName, productCode);
+        if (success) {
+            alert('Produto atualizado com sucesso!');
+            resetEditProductForm();
+            
+            // Fechar o modal
+            const modal = bootstrap.Modal.getInstance(elements.editProductModal);
+            if (modal) {
+                modal.hide();
+            }
+            
+            await fetchAllData(); // Recarrega todos os dados
+        } else {
+            alert('Erro ao atualizar produto.');
+        }
+    } catch (error) {
+        console.error('Erro ao atualizar produto:', error);
+        alert(`Erro ao atualizar produto: ${error.message || 'Erro desconhecido'}`);
+    }
+};
+
+// Event listeners para edição de produtos
+if (elements.editProductForm) {
+    elements.editProductForm.addEventListener('submit', handleEditProductSubmit);
+}
+
+if (elements.editProductModal) {
+    elements.editProductModal.addEventListener('hidden.bs.modal', resetEditProductForm);
+}
+
+// Event listener para botões de edição de produto
+document.addEventListener('click', async (e) => {
+    if (e.target.closest('.edit-product-button')) {
+        const button = e.target.closest('.edit-product-button');
+        const id = button.dataset.id;
+        const name = button.dataset.name;
+        const code = button.dataset.code;
+        
+        if (id && name) {
+            editProduct(id, name, code);
+        }
+    }
+});
+
+
+
+// Função para abrir o modal de edição de produto
+const editProduct = (id, name, code) => {
+    elements.editProductNameInput.value = name;
+    elements.editProductCodeInput.value = code || '';
+    elements.editProductForm.dataset.editingId = id;
+    
+    const modal = new bootstrap.Modal(elements.editProductModal);
+    modal.show();
+};
 
 // Variáveis globais para importação
 let currentImportStep = 1;
