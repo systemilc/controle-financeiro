@@ -1,15 +1,15 @@
 {
   "name": "controle-de-contas",
-  "version": "1.0.0",
-  "description": "",
+  "version": "1.1.0",
+  "description": "Sistema completo de controle financeiro multi-contas desenvolvido com Node.js",
   "main": "server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": ["financeiro", "controle", "multi-contas", "nodejs", "express", "sqlite"],
+  "author": "Isaac - WhatsApp: 73 9 9871 8725",
+  "license": "PROPRIETARY",
   "dependencies": {
     "bcryptjs": "^3.0.2",
     "express": "^5.1.0",
