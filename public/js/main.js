@@ -1201,7 +1201,7 @@ const handlePaymentTypeFormSubmit = async (e) => {
     const paymentTypeName = elements.paymentTypeNameInput.value;
     const isIncome = elements.paymentTypeIncomeCheckbox.checked;
     const isExpense = elements.paymentTypeExpenseCheckbox.checked;
-    const isAsset = elements.paymentTypeAssetCheckbox.checked;
+    const isActive = elements.paymentTypeActiveCheckbox.checked;
     const paymentTypeId = elements.paymentTypeForm.dataset.editingId; // Para edição
 
     if (!paymentTypeName) {
@@ -1209,19 +1209,19 @@ const handlePaymentTypeFormSubmit = async (e) => {
         return;
     }
 
-    if (!isIncome && !isExpense && !isAsset) {
-        alert('Por favor, selecione pelo menos uma opção (Entrada, Saída ou Ativo).');
+    if (!isIncome && !isExpense) {
+        alert('Por favor, selecione pelo menos uma opção (Entrada ou Saída).');
         return;
     }
 
     try {
         let success;
         if (paymentTypeId) {
-            success = await api.editPaymentType(paymentTypeId, paymentTypeName, isIncome, isExpense, isAsset);
+            success = await api.editPaymentType(paymentTypeId, paymentTypeName, isIncome, isExpense, isActive);
             if (success) alert('Tipo de pagamento atualizado com sucesso!');
             elements.paymentTypeForm.removeAttribute('data-editing-id');
         } else {
-            success = await api.createPaymentType(paymentTypeName, isIncome, isExpense, isAsset);
+            success = await api.createPaymentType(paymentTypeName, isIncome, isExpense, isActive);
             if (success) alert('Tipo de pagamento adicionado com sucesso!');
         }
         
@@ -1229,7 +1229,7 @@ const handlePaymentTypeFormSubmit = async (e) => {
             elements.paymentTypeNameInput.value = '';
             elements.paymentTypeIncomeCheckbox.checked = false;
             elements.paymentTypeExpenseCheckbox.checked = false;
-            elements.paymentTypeAssetCheckbox.checked = false;
+            elements.paymentTypeActiveCheckbox.checked = true; // Reset para ativo por padrão
             fetchAllData(); // Recarrega todos os tipos de pagamento
         } else {
             alert('Erro ao salvar tipo de pagamento. Verifique se já existe um tipo com este nome.');
@@ -1257,11 +1257,11 @@ const deletePaymentType = async (id, name) => {
     }
 };
 
-const editPaymentType = async (id, name, isIncome, isExpense, isAsset) => {
+const editPaymentType = async (id, name, isIncome, isExpense, isActive) => {
     elements.paymentTypeNameInput.value = name;
     elements.paymentTypeIncomeCheckbox.checked = isIncome == 1;
     elements.paymentTypeExpenseCheckbox.checked = isExpense == 1;
-    elements.paymentTypeAssetCheckbox.checked = isAsset == 1;
+    elements.paymentTypeActiveCheckbox.checked = isActive == 1;
     elements.paymentTypeForm.dataset.editingId = id; // Armazena o ID do tipo de pagamento que está sendo editado
     elements.paymentTypeForm.querySelector('button[type="submit"]').textContent = 'Atualizar Tipo de Pagamento';
 };
@@ -1275,14 +1275,14 @@ elements.paymentTypesList.addEventListener('click', async (e) => {
     const name = target.dataset.name;
     const isIncome = target.dataset.income;
     const isExpense = target.dataset.expense;
-    const isAsset = target.dataset.asset;
+    const isActive = target.dataset.active;
 
     if (!id) return;
 
     if (target.classList.contains('delete-payment-type-button')) {
         deletePaymentType(id, name);
     } else if (target.classList.contains('edit-payment-type-button')) {
-        editPaymentType(id, name, isIncome, isExpense, isAsset);
+        editPaymentType(id, name, isIncome, isExpense, isActive);
     }
 });
 

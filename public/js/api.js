@@ -204,20 +204,20 @@ export const api = {
         return await response.json();
     },
 
-    createPaymentType: async (name, is_income, is_expense, is_asset) => {
+    createPaymentType: async (name, is_income, is_expense, is_active) => {
         const response = await fetch('/api/payment-types', {
             method: 'POST',
             headers: headers(),
-            body: JSON.stringify({ name, is_income, is_expense, is_asset }),
+            body: JSON.stringify({ name, is_income, is_expense, is_active }),
         });
         return response.ok;
     },
 
-    editPaymentType: async (id, name, is_income, is_expense, is_asset) => {
+    editPaymentType: async (id, name, is_income, is_expense, is_active) => {
         const response = await fetch(`/api/payment-types/${id}`, {
             method: 'PUT',
             headers: headers(),
-            body: JSON.stringify({ name, is_income, is_expense, is_asset }),
+            body: JSON.stringify({ name, is_income, is_expense, is_active }),
         });
         return response.ok;
     },
