@@ -50,7 +50,9 @@ Um sistema completo e robusto para gerenciar finanças pessoais e de grupo, dese
 
 ### 💳 Tipos de Pagamento
 - **Gestão completa**: CRUD para formas de pagamento
-- **Aplicabilidade**: Entrada, Saída e Ativo
+- **Aplicabilidade**: Entrada e Saída
+- **Status ativo/inativo**: Controle de visibilidade nas transações
+- **Filtro automático**: Tipos inativos não aparecem nas opções
 - **Integração**: Vinculação com transações e importações
 
 ### 📋 Importação de Planilhas
@@ -164,9 +166,10 @@ Abra seu navegador e acesse: **http://localhost:3000**
 - Validação de uso em transações
 
 #### 💳 Tipos de Pagamento
-- Criar tipos de pagamento (Entrada, Saída, Ativo)
+- Criar tipos de pagamento (Entrada, Saída)
+- Controlar status ativo/inativo
 - Editar e excluir tipos
-- Aplicabilidade configurável
+- Filtro automático nas transações
 
 #### 📋 Importar Compra
 - Upload de planilhas Excel/CSV
@@ -223,7 +226,7 @@ accounts (id, name, group_id)
 categories (id, group_id, name, type)
 
 -- Tipos de Pagamento
-payment_types (id, group_id, name, is_income, is_expense, is_asset)
+payment_types (id, group_id, name, is_income, is_expense, is_asset, is_active)
 
 -- Transações
 transactions (id, user_id, account_id, category_id, payment_type_id, description, amount, type, is_confirmed, created_at, due_date, confirmed_at, is_transfer, original_account_name)
@@ -309,6 +312,17 @@ npm install  # Instala dependências
 ✅ **Dashboard com gráficos interativos**
 ✅ **Sistema de usuários e grupos**
 ✅ **Conformidade com LGPD**
+✅ **Status ativo/inativo para tipos de pagamento**
+
+## 🔄 Atualizações Recentes
+
+### v1.1.0 - Status de Tipos de Pagamento
+- **Novo**: Campo `is_active` para tipos de pagamento
+- **Novo**: Filtro automático - tipos inativos não aparecem nas transações
+- **Novo**: Interface visual com badges de status (Ativo/Inativo)
+- **Melhoria**: Simplificação da interface - removido checkbox "Ativo" confuso
+- **Melhoria**: Validação aprimorada - exige apenas Entrada ou Saída
+- **Correção**: Migração automática para bancos existentes
 
 ---
 

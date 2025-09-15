@@ -106,7 +106,7 @@ export const elements = {
     paymentTypeNameInput: document.getElementById('payment-type-name'),
     paymentTypeIncomeCheckbox: document.getElementById('payment-type-income'),
     paymentTypeExpenseCheckbox: document.getElementById('payment-type-expense'),
-    paymentTypeAssetCheckbox: document.getElementById('payment-type-asset'),
+    paymentTypeActiveCheckbox: document.getElementById('payment-type-active'),
     paymentTypeForm: document.getElementById('payment-type-form'),
     paymentTypesList: document.getElementById('payment-types-list'),
     paymentTypeSelect: document.getElementById('payment-type-select'), // Select de tipos de pagamento no formulário de transações
@@ -980,15 +980,19 @@ export const render = {
             const badges = [];
             if (paymentType.is_income) badges.push('<span class="badge bg-success me-1">Entrada</span>');
             if (paymentType.is_expense) badges.push('<span class="badge bg-danger me-1">Saída</span>');
-            if (paymentType.is_asset) badges.push('<span class="badge bg-primary me-1">Ativo</span>');
+            
+            // Adiciona badge de status ativo/inativo
+            const statusBadge = paymentType.is_active === 1 ? 
+                '<span class="badge bg-success me-1">Ativo</span>' : 
+                '<span class="badge bg-secondary me-1">Inativo</span>';
             
             li.innerHTML = `
                 <div>
                     <strong>${paymentType.name}</strong>
-                    <div class="mt-1">${badges.join('')}</div>
+                    <div class="mt-1">${badges.join('')} ${statusBadge}</div>
                 </div>
                 <div>
-                    <button class="btn btn-info btn-sm me-2 edit-payment-type-button" data-id="${paymentType.id}" data-name="${paymentType.name}" data-income="${paymentType.is_income}" data-expense="${paymentType.is_expense}" data-asset="${paymentType.is_asset}">
+                    <button class="btn btn-info btn-sm me-2 edit-payment-type-button" data-id="${paymentType.id}" data-name="${paymentType.name}" data-income="${paymentType.is_income}" data-expense="${paymentType.is_expense}" data-active="${paymentType.is_active}">
                         <i class="fas fa-edit"></i> Editar
                     </button>
                     <button class="btn btn-danger btn-sm delete-payment-type-button" data-id="${paymentType.id}" data-name="${paymentType.name}">
@@ -1003,11 +1007,15 @@ export const render = {
     populatePaymentTypeSelect: (paymentTypes, currentType) => {
         elements.paymentTypeSelect.innerHTML = '<option value="">Nenhum</option>';
         
-        // Filtra os tipos de pagamento baseado no tipo de transação
+        // Filtra os tipos de pagamento baseado no tipo de transação e status ativo
         const filteredPaymentTypes = paymentTypes.filter(pt => {
+            // Primeiro filtra por status ativo
+            if (pt.is_active !== 1) return false;
+            
+            // Depois filtra por tipo de transação
             if (currentType === 'income') return pt.is_income;
             if (currentType === 'expense') return pt.is_expense;
-            return true; // Se não especificado, mostra todos
+            return true; // Se não especificado, mostra todos os ativos
         });
 
         filteredPaymentTypes.forEach(paymentType => {
@@ -1194,9 +1202,9 @@ export const render = {
             elements.importAccountSelect.appendChild(option);
         });
 
-        // Popula select de tipos de pagamento (apenas para despesas)
+        // Popula select de tipos de pagamento (apenas para despesas e ativos)
         elements.importPaymentTypeSelect.innerHTML = '<option value="">Selecione o tipo</option>';
-        const expensePaymentTypes = paymentTypes.filter(pt => pt.is_expense);
+        const expensePaymentTypes = paymentTypes.filter(pt => pt.is_expense && pt.is_active === 1);
         expensePaymentTypes.forEach(paymentType => {
             const option = document.createElement('option');
             option.value = paymentType.id;

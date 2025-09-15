@@ -79,6 +79,19 @@ db.serialize(() => {
         });
     });
 
+    // Adiciona a coluna is_active à tabela payment_types se ela não existir
+    db.all(`PRAGMA table_info(payment_types)`, (err, tableInfo) => {
+        if (!tableInfo || !Array.isArray(tableInfo) || !tableInfo.some(c => c.name === 'is_active')) {
+            db.run(`ALTER TABLE payment_types ADD COLUMN is_active INTEGER DEFAULT 1`, (err) => {
+                if (err) {
+                    console.error('Erro ao adicionar a coluna is_active em payment_types:', err.message);
+                } else {
+                    console.log('Coluna is_active adicionada à tabela payment_types');
+                }
+            });
+        }
+    });
+
     db.run(`
         CREATE TABLE IF NOT EXISTS accounts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -106,6 +119,7 @@ db.serialize(() => {
             is_income INTEGER DEFAULT 0, -- 1 se pode ser usado para entrada
             is_expense INTEGER DEFAULT 0, -- 1 se pode ser usado para saída
             is_asset INTEGER DEFAULT 0, -- 1 se é considerado ativo
+            is_active INTEGER DEFAULT 1, -- 1 se está ativo, 0 se inativo
             UNIQUE(group_id, name), -- Garante que não haja tipos de pagamento duplicados por grupo
             FOREIGN KEY(group_id) REFERENCES users(group_id)
         )
@@ -939,7 +953,7 @@ app.delete('/api/categories/:id', authenticate, (req, res) => {
 
 // POST: Criar um novo tipo de pagamento
 app.post('/api/payment-types', authenticate, (req, res) => {
-    const { name, is_income, is_expense, is_asset } = req.body;
+    const { name, is_income, is_expense, is_active } = req.body;
     const groupId = req.groupId;
 
     if (!name) {
@@ -947,12 +961,12 @@ app.post('/api/payment-types', authenticate, (req, res) => {
     }
 
     // Valida se pelo menos um checkbox foi marcado
-    if (!is_income && !is_expense && !is_asset) {
-        return res.status(400).json({ message: 'Pelo menos uma opção (Entrada, Saída ou Ativo) deve ser selecionada.' });
+    if (!is_income && !is_expense) {
+        return res.status(400).json({ message: 'Pelo menos uma opção (Entrada ou Saída) deve ser selecionada.' });
     }
 
-    db.run(`INSERT INTO payment_types (group_id, name, is_income, is_expense, is_asset) VALUES (?, ?, ?, ?, ?)`, 
-        [groupId, name, is_income ? 1 : 0, is_expense ? 1 : 0, is_asset ? 1 : 0], 
+    db.run(`INSERT INTO payment_types (group_id, name, is_income, is_expense, is_asset, is_active) VALUES (?, ?, ?, ?, ?, ?)`, 
+        [groupId, name, is_income ? 1 : 0, is_expense ? 1 : 0, 0, is_active ? 1 : 0], 
         function(err) {
             if (err) {
                 if (err.message.includes('UNIQUE constraint failed')) {
@@ -976,7 +990,7 @@ app.post('/api/payment-types', authenticate, (req, res) => {
 app.get('/api/payment-types', authenticate, (req, res) => {
     const groupId = req.groupId;
 
-    db.all(`SELECT id, name, is_income, is_expense, is_asset, group_id FROM payment_types WHERE group_id = ? ORDER BY name ASC`, [groupId], (err, rows) => {
+    db.all(`SELECT id, name, is_income, is_expense, is_asset, is_active, group_id FROM payment_types WHERE group_id = ? ORDER BY name ASC`, [groupId], (err, rows) => {
         if (err) {
             console.error('Erro ao buscar tipos de pagamento no banco de dados:', err.message);
             return res.status(500).json({ message: 'Erro ao buscar tipos de pagamento', error: err.message });
@@ -988,7 +1002,7 @@ app.get('/api/payment-types', authenticate, (req, res) => {
 // PUT: Atualizar um tipo de pagamento
 app.put('/api/payment-types/:id', authenticate, (req, res) => {
     const { id } = req.params;
-    const { name, is_income, is_expense, is_asset } = req.body;
+    const { name, is_income, is_expense, is_active } = req.body;
     const groupId = req.groupId;
 
     if (!name) {
@@ -996,15 +1010,15 @@ app.put('/api/payment-types/:id', authenticate, (req, res) => {
     }
 
     // Valida se pelo menos um checkbox foi marcado
-    if (!is_income && !is_expense && !is_asset) {
-        return res.status(400).json({ message: 'Pelo menos uma opção (Entrada, Saída ou Ativo) deve ser selecionada.' });
+    if (!is_income && !is_expense) {
+        return res.status(400).json({ message: 'Pelo menos uma opção (Entrada ou Saída) deve ser selecionada.' });
     }
 
     db.run(`
         UPDATE payment_types
-        SET name = ?, is_income = ?, is_expense = ?, is_asset = ?
+        SET name = ?, is_income = ?, is_expense = ?, is_asset = ?, is_active = ?
         WHERE id = ? AND group_id = ?
-    `, [name, is_income ? 1 : 0, is_expense ? 1 : 0, is_asset ? 1 : 0, id, groupId], function(err) {
+    `, [name, is_income ? 1 : 0, is_expense ? 1 : 0, 0, is_active ? 1 : 0, id, groupId], function(err) {
         if (err) {
             if (err.message.includes('UNIQUE constraint failed')) {
                 return res.status(400).json({ message: 'Já existe um tipo de pagamento com este nome para o seu grupo.' });
