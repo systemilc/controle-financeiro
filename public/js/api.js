@@ -370,5 +370,19 @@ export const api = {
     fetchProductDetails: async (id) => {
         const response = await fetch(`/api/products/${id}/details`, { headers: headers() });
         return await response.json();
+    },
+
+    // --- API DE EDIÇÃO DE PRODUTO ---
+    editProduct: async (id, name, code) => {
+        const response = await fetch(`/api/products/${id}`, {
+            method: 'PUT',
+            headers: headers(),
+            body: JSON.stringify({ name, code }),
+        });
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Erro ao editar produto');
+        }
+        return response.ok;
     }
 };

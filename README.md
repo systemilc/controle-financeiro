@@ -68,11 +68,13 @@ Um sistema completo e robusto para gerenciar finanças pessoais e de grupo, dese
 
 ### 📦 Gestão de Produtos
 - **Cadastro automático**: Produtos criados via importação
+- **Edição manual**: Modificação de nome e código dos produtos
 - **Histórico de compras**: Rastreamento completo por produto
 - **Comparação de preços**: Análise entre fornecedores
 - **Produtos associados**: Unificação de produtos similares
 - **Estatísticas avançadas**: Preço médio, última compra, fornecedores
 - **Busca inteligente**: Filtros por nome e código
+- **Interface intuitiva**: Modal de edição com validação
 
 ### 🛒 Compras Importadas
 - **Visualização completa**: Lista de todas as compras importadas
@@ -189,6 +191,7 @@ Abra seu navegador e acesse: **http://localhost:3000**
 
 #### 📦 Produtos
 - Listagem de produtos importados
+- Edição de nome e código dos produtos
 - Histórico de compras por produto
 - Comparação de preços entre fornecedores
 - Unificação de produtos similares
@@ -316,8 +319,18 @@ npm install  # Instala dependências
 ✅ **Sistema de usuários e grupos**
 ✅ **Conformidade com LGPD**
 ✅ **Status ativo/inativo para tipos de pagamento**
+✅ **Edição de produtos com interface intuitiva**
 
 ## 🔄 Atualizações Recentes
+
+### v1.2.0 - Edição de Produtos
+- **Novo**: Funcionalidade de edição de produtos
+- **Novo**: Modal intuitivo para editar nome e código
+- **Novo**: Botão de edição na tabela de produtos
+- **Novo**: Validação de dados no frontend e backend
+- **Melhoria**: Fechamento automático do modal após salvar
+- **Melhoria**: Atualização automática da lista após edição
+- **Correção**: Posicionamento correto do modal na estrutura HTML
 
 ### v1.1.0 - Status de Tipos de Pagamento
 - **Novo**: Campo `is_active` para tipos de pagamento
@@ -360,5 +373,5 @@ Sistema desenvolvido com foco na experiência do usuário e robustez técnica.
 ---
 
 **© 2025 Isaac - Todos os direitos reservados**  
-**Versão do sistema:** 1.1.0  
+**Versão do sistema:** 1.2.0  
 **Licença:** PROPRIETÁRIA - Uso restrito
